@@ -1,1 +1,0 @@
-print("Halo dari file Python!")

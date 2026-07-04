@@ -24,10 +24,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=naaklaam
-WorkingDirectory=/home/naaklaam/Supikip
+User=<username-linux-anda>
+WorkingDirectory=/home/<username-linux-anda>/Supikip
 # Path executable node harus absolut. Contoh di bawah menggunakan path default.
-# Jika menggunakan nvm/fnm, gunakan hasil perintah 'which node' (misal: /home/naaklaam/.nvm/...)
+# Jika menggunakan nvm/fnm, gunakan hasil perintah 'which node' (misal: /home/<username-linux-anda>/.nvm/...)
 ExecStart=/usr/bin/node bot-speaki.js
 Restart=always
 RestartSec=5
@@ -46,7 +46,7 @@ Karena systemd membutuhkan path absolut yang tepat untuk file executable Node, j
 which node
 ```
 *Jika outputnya adalah `/usr/bin/node`, gunakan nilai tersebut pada kolom `ExecStart=` di atas.*
-*Jika outputnya berada di folder `.nvm` (contoh: `/home/naaklaam/.nvm/versions/node/v26.3.0/bin/node`), pastikan Anda menyalin seluruh path tersebut ke `ExecStart=`.*
+*Jika outputnya berada di folder `.nvm` (contoh: `/home/<username-linux-anda>/.nvm/versions/node/v26.3.0/bin/node`), pastikan Anda menyalin seluruh path tersebut ke `ExecStart=`.*
 
 ---
 

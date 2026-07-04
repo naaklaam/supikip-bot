@@ -20,7 +20,7 @@ const FETCH_TIMEOUT_MS = 800; // Timeout untuk fetch Shinigami (800ms)
 // ==========================================
 // CONFIG & FUNGSI SCRAPER SHINIGAMI MANHWA
 // ==========================================
-const SHINIGAMI_STATE_FILE = path.join('/home/naaklaam/Supikip', 'last_manhwa.json');
+const SHINIGAMI_STATE_FILE = path.join(process.cwd(), 'last_manhwa.json');
 const MANHWA_GROUP_JID = process.env.MANHWA_GROUP_JID || '120363407159758205@g.us';
 const MANHWA_CHECK_INTERVAL = parseInt(process.env.MANHWA_CHECK_INTERVAL, 10) || 900000; // 15 menit
 const scraperHeaders = {
@@ -230,7 +230,7 @@ async function checkShinigamiUpdates(sock) {
  * Fungsi untuk memeriksa HEARTBEAT.md dan memproses tugas berkala jika terisi.
  */
 async function checkHeartbeat(sock) {
-  const filePath = path.join('/home/naaklaam/Supikip', 'HEARTBEAT.md');
+  const filePath = path.join(process.cwd(), 'HEARTBEAT.md');
   if (!fs.existsSync(filePath)) return;
 
   try {
@@ -295,7 +295,7 @@ function initCronSchedules(sock) {
   activeCronJobs.forEach(job => job.stop());
   activeCronJobs = [];
 
-  const filePath = path.join('/home/naaklaam/Supikip', 'schedules.json');
+  const filePath = path.join(process.cwd(), 'schedules.json');
   if (!fs.existsSync(filePath)) {
     console.log('[Cron Scheduler] Berkas schedules.json tidak ditemukan. Melewati.');
     return;
@@ -393,7 +393,7 @@ function getSystemInstruction() {
   let promptParts = [];
 
   for (const fileName of fileNames) {
-    const filePath = path.join('/home/naaklaam/Supikip', fileName);
+    const filePath = path.join(process.cwd(), fileName);
     try {
       if (fs.existsSync(filePath)) {
         const content = fs.readFileSync(filePath, 'utf-8');
@@ -733,7 +733,7 @@ async function startBot() {
           const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: pino({ level: 'silent' }) });
           // Simpan ke subfolder stiker_db agar rapi
           const fileName = `sticker_${Date.now()}.webp`;
-          const savePath = path.join('/home/naaklaam/Supikip/stiker_db', fileName);
+          const savePath = path.join(process.cwd(), 'stiker_db', fileName);
           fs.writeFileSync(savePath, buffer);
 
           // Daftarkan ke database SQLite

@@ -1,6 +1,6 @@
 # Dokumentasi Direktori Baileys (`@itsliaaa/baileys`)
 
-Dokumen ini menjelaskan struktur direktori, arsitektur modul, komponen utama, serta panduan penggunaan dasar dari pustaka **Baileys** yang berada di dalam folder [baileys](file:///home/naaklaam/agy-envi/baileys) di workspace ini.
+Dokumen ini menjelaskan struktur direktori, arsitektur modul, komponen utama, serta panduan penggunaan dasar dari pustaka **Baileys** yang berada di dalam folder [baileys](file://./baileys) di workspace ini.
 
 Pustaka yang digunakan di sini adalah **`@itsliaaa/baileys` (v0.3.18-final)**, yang merupakan versi *fork* yang ditingkatkan dari pustaka Baileys asli (WhiskeySockets/Baileys). Versi ini dirancang untuk penggunaan produksi dengan fokus pada keamanan, perbaikan unggahan media newsletter, serta dukungan untuk pesan interaktif, album, dan tipe pesan baru lainnya tanpa adanya kode yang ter-obfuscation.
 
@@ -215,4 +215,4 @@ Setelah koneksi terjalin (`sock` siap digunakan), Anda dapat mengirim berbagai t
 
 > [!TIP]
 > **Catatan Pengembangan**:
-> Jika Anda menghadapi masalah kompilasi TypeScript atau kesalahan dependensi seperti `@napi-rs/image`, pastikan Anda menginstal pustaka opsional yang sesuai dengan OS yang Anda gunakan (`better-sqlite3`, `sharp`, `link-preview-js`) dengan mereferensikan bagian `peerDependencies` dalam file [package.json](file:///home/naaklaam/agy-envi/baileys/package.json).
+> Jika Anda menghadapi masalah kompilasi TypeScript atau kesalahan dependensi seperti `@napi-rs/image`, pastikan Anda menginstal pustaka opsional yang sesuai dengan OS yang Anda gunakan (`better-sqlite3`, `sharp`, `link-preview-js`) dengan mereferensikan bagian `peerDependencies` dalam file [package.json](file://./baileys/package.json).

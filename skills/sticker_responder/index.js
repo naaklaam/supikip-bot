@@ -22,7 +22,7 @@ export async function execute(args, sock) {
             return `Gagal mengirim stiker: Tidak ada stiker dengan tag "${tag}" terdaftar di database SQLite. Silakan kirim stiker ke bot terlebih dahulu untuk menambahkannya.`;
         }
 
-        const stickerPath = path.join('/home/naaklaam/Supikip/stiker_db', stickerRow.filename);
+        const stickerPath = path.join(process.cwd(), 'stiker_db', stickerRow.filename);
 
         if (!fs.existsSync(stickerPath)) {
             return `Gagal mengirim stiker: Berkas fisik stiker "${stickerRow.filename}" tidak ditemukan di server.`;

@@ -8,7 +8,7 @@ const pdf = require('pdf-parse');
 
 // Pastikan kita mengimpor checkShinigamiUpdates dari berkas utama
 // Karena checkShinigamiUpdates memerlukan instance sock, kita akan meneruskannya saat memanggil executeTool
-const SHINIGAMI_STATE_FILE = path.join('/home/naaklaam/Supikip', 'last_manhwa.json');
+const SHINIGAMI_STATE_FILE = path.join(process.cwd(), 'last_manhwa.json');
 
 // Peta penyimpanan modul skill yang dimuat secara dinamis
 const loadedSkills = new Map();
@@ -17,7 +17,7 @@ const loadedSkills = new Map();
  * Memindai direktori 'skills/' dan memuat skema serta fungsi eksekusi secara dinamis.
  */
 function loadDynamicSkills() {
-    const skillsDir = '/home/naaklaam/Supikip/skills';
+    const skillsDir = path.join(process.cwd(), 'skills');
     const dynamicSchemas = [];
 
     if (!fs.existsSync(skillsDir)) return dynamicSchemas;
@@ -475,7 +475,7 @@ async function webFetch(url) {
  * Implementasi Tool 5: Membaca berkas workspace
  */
 function readWorkspaceFile(filename) {
-    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
     console.log(`[Tool: read_workspace_file] Membaca: ${safePath}`);
     try {
         if (!fs.existsSync(safePath)) return `File tidak ditemukan: ${filename}`;
@@ -490,7 +490,7 @@ function readWorkspaceFile(filename) {
  * Implementasi Tool 6: Menulis/Memperbarui berkas workspace
  */
 function writeWorkspaceFile(filename, content) {
-    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
     console.log(`[Tool: write_workspace_file] Menulis ke: ${safePath}`);
     try {
         fs.writeFileSync(safePath, content, 'utf-8');
@@ -506,7 +506,7 @@ function writeWorkspaceFile(filename, content) {
 function runTerminalCommand(command) {
     console.log(`[Tool: run_terminal_command] Mengeksekusi: ${command}`);
     return new Promise((resolve) => {
-        exec(command, { cwd: '/home/naaklaam/Supikip' }, (error, stdout, stderr) => {
+        exec(command, { cwd: process.cwd() }, (error, stdout, stderr) => {
             if (error) {
                 resolve(`Error: ${error.message}\nStderr: ${stderr}`);
                 return;
@@ -521,7 +521,7 @@ function runTerminalCommand(command) {
  */
 function addCronSchedule(schedule, description, prompt) {
     console.log(`[Tool: add_cron_schedule] Menambahkan schedule: ${schedule}`);
-    const filePath = path.join('/home/naaklaam/Supikip', 'schedules.json');
+    const filePath = path.join(process.cwd(), 'schedules.json');
     try {
         let schedules = [];
         if (fs.existsSync(filePath)) {
@@ -540,7 +540,7 @@ function addCronSchedule(schedule, description, prompt) {
  */
 function removeCronSchedule(description) {
     console.log(`[Tool: remove_cron_schedule] Menghapus schedule dengan deskripsi: ${description}`);
-    const filePath = path.join('/home/naaklaam/Supikip', 'schedules.json');
+    const filePath = path.join(process.cwd(), 'schedules.json');
     try {
         if (!fs.existsSync(filePath)) return 'File schedules.json tidak ditemukan.';
         let schedules = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -579,7 +579,7 @@ function setOneShotReminder(durationSeconds, message, sock) {
  * Implementasi Tool 11: Apply Patch / Modifikasi Berkas Presisi
  */
 function applyPatch(filename, targetContent, replacementContent) {
-    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
     console.log(`[Tool: apply_patch] Modifikasi file: ${safePath}`);
     try {
         if (!fs.existsSync(safePath)) return `File tidak ditemukan: ${filename}`;
@@ -601,7 +601,7 @@ function applyPatch(filename, targetContent, replacementContent) {
  * Implementasi Tool 12: Membaca teks dokumen PDF lokal
  */
 async function parsePdfFile(filename) {
-    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
     console.log(`[Tool: parse_pdf_file] Mengekstrak PDF: ${safePath}`);
     try {
         if (!fs.existsSync(safePath)) return `File PDF tidak ditemukan: ${filename}`;
@@ -622,7 +622,7 @@ async function parsePdfFile(filename) {
  * Implementasi Tool 13: Menganalisis gambar menggunakan Gemini multimodal via OpenRouter
  */
 async function analyzeImage(filename, prompt) {
-    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
     console.log(`[Tool: analyze_image] Menganalisis gambar: ${safePath}`);
     try {
         if (!fs.existsSync(safePath)) return `File gambar tidak ditemukan: ${filename}`;
@@ -749,7 +749,7 @@ async function runPerformanceTest() {
     // 2. Uji Latensi Pembacaan Berkas Lokal
     const startFile = Date.now();
     try {
-        const testPath = path.join('/home/naaklaam/Supikip', 'bot-speaki.js');
+        const testPath = path.join(process.cwd(), 'bot-speaki.js');
         if (fs.existsSync(testPath)) {
             fs.readFileSync(testPath, 'utf-8');
             result.fileReadLatencyMs = Date.now() - startFile;
@@ -794,7 +794,7 @@ async function runPerformanceTest() {
  * Implementasi Tool 16: Mengirim berkas dokumen/file ke obrolan WhatsApp
  */
 async function sendWorkspaceFile(filename, caption, sock) {
-    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
     console.log(`[Tool: send_workspace_file] Mengirim file: ${safePath}`);
     try {
         if (!fs.existsSync(safePath)) return `Berkas tidak ditemukan: ${filename}`;

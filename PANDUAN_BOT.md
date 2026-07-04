@@ -1,6 +1,6 @@
 # 📖 Panduan Menjalankan Bot WhatsApp Speaki Standalone
 
-Panduan ini membantu Anda menyiapkan, mengonfigurasi, dan menjalankan bot WhatsApp **Speaki** yang super cepat dan responsif secara terpisah dari framework OpenClaw, namun tetap menggunakan modul WhatsApp [baileys](file:///home/naaklaam/Supikip/baileys).
+Panduan ini membantu Anda menyiapkan, mengonfigurasi, dan menjalankan bot WhatsApp **Speaki** yang super cepat dan responsif secara terpisah dari framework OpenClaw, namun tetap menggunakan modul WhatsApp [baileys](file://./baileys).
 
 ---
 
@@ -12,21 +12,21 @@ Panduan ini membantu Anda menyiapkan, mengonfigurasi, dan menjalankan bot WhatsA
 
 ## 📂 Struktur Berkas Bot & Prompting Terstruktur
 
-Semua berkas bot berada di direktori `/home/naaklaam/Supikip`:
-1. **[bot-speaki.js](file:///home/naaklaam/Supikip/bot-speaki.js)**: Berkas kode utama bot WhatsApp. Mengatur koneksi socket, pemrosesan pesan, interseptor stiker masuk, dan integrasi dengan OpenRouter API.
-2. **[tools.js](file:///home/naaklaam/Supikip/tools.js)**: Registry utama tools statis dan loader untuk dynamic skills.
-3. **[package.json](file:///home/naaklaam/Supikip/package.json)**: Berkas manifes Node.js untuk dependensi (`@itsliaaa/baileys`, `node-cron`, `pdf-parse`).
-4. **[.env](file:///home/naaklaam/Supikip/.env)**: API Key OpenRouter dan konfigurasi model LLM.
-5. **[skills/](file:///home/naaklaam/Supikip/skills)**: Folder penyimpanan modul kemampuan (*dynamic skills*) pihak ketiga yang dimuat secara dinamis.
+Semua berkas bot berada di direktori project Speaki:
+1. **[bot-speaki.js](file://./bot-speaki.js)**: Berkas kode utama bot WhatsApp. Mengatur koneksi socket, pemrosesan pesan, interseptor stiker masuk, dan integrasi dengan OpenRouter API.
+2. **[tools.js](file://./tools.js)**: Registry utama tools statis dan loader untuk dynamic skills.
+3. **[package.json](file://./package.json)**: Berkas manifes Node.js untuk dependensi (`@itsliaaa/baileys`, `node-cron`, `pdf-parse`).
+4. **[.env](file://./.env)**: API Key OpenRouter dan konfigurasi model LLM.
+5. **[skills/](file://./skills)**: Folder penyimpanan modul kemampuan (*dynamic skills*) pihak ketiga yang dimuat secara dinamis.
 
 ### 🧠 Berkas Prompting Terstruktur (Gaya OpenClaw)
 Kepribadian dan perilaku bot ditentukan secara modular melalui file-file markdown berikut yang digabungkan secara dinamis sebagai System Prompt:
-* **[AGENTS.md](file:///home/naaklaam/Supikip/AGENTS.md)**: Aturan dasar sesi, penanganan grup chat, dan aturan pemeliharaan memori (Memory Pruning).
-* **[IDENTITY.md](file:///home/naaklaam/Supikip/IDENTITY.md)**: Identitas agen (Nama, Peran, Vibe profesional, efisien, dan ketus).
-* **[SOUL.md](file:///home/naaklaam/Supikip/SOUL.md)**: Inti kepribadian, nada bicara dingin/ketus tanpa basa-basi, dan batasan perilaku.
-* **[TOOLS.md](file:///home/naaklaam/Supikip/TOOLS.md)**: Catatan lokal infrastruktur dan lingkungan kerja.
-* **[HEARTBEAT.md](file:///home/naaklaam/Supikip/HEARTBEAT.md)**: Berisi daftar tugas berkala yang dievaluasi LLM saat interval detak jantung berjalan.
-* **[MEMORY.md](file:///home/naaklaam/Supikip/MEMORY.md)**: Catatan memori jangka panjang ringkas terstruktur (Wajib berada di bawah 30 baris).
+* **[AGENTS.md](file://./AGENTS.md)**: Aturan dasar sesi, penanganan grup chat, dan aturan pemeliharaan memori (Memory Pruning).
+* **[IDENTITY.md](file://./IDENTITY.md)**: Identitas agen (Nama, Peran, Vibe profesional, efisien, dan ketus).
+* **[SOUL.md](file://./SOUL.md)**: Inti kepribadian, nada bicara dingin/ketus tanpa basa-basi, dan batasan perilaku.
+* **[TOOLS.md](file://./TOOLS.md)**: Catatan lokal infrastruktur dan lingkungan kerja.
+* **[HEARTBEAT.md](file://./HEARTBEAT.md)**: Berisi daftar tugas berkala yang dievaluasi LLM saat interval detak jantung berjalan.
+* **[MEMORY.md](file://./MEMORY.md)**: Catatan memori jangka panjang ringkas terstruktur (Wajib berada di bawah 30 baris).
 
 ---
 
@@ -35,12 +35,12 @@ Kepribadian dan perilaku bot ditentukan secara modular melalui file-file markdow
 ### Langkah 1: Instal Seluruh Dependensi secara Otomatis
 Kita menggunakan NPM untuk menginstal seluruh pustaka yang dibutuhkan secara otomatis. 
 ```bash
-cd /home/naaklaam/Supikip
+cd /path/to/project/Supikip
 npm install --legacy-peer-deps
 ```
 
 ### Langkah 2: Konfigurasi API Key OpenRouter
-Buka file **[.env](file:///home/naaklaam/Supikip/.env)** di text editor Anda, lalu masukkan kunci API OpenRouter Anda.
+Buka file **[.env](file://./.env)** di text editor Anda, lalu masukkan kunci API OpenRouter Anda.
 
 ### Langkah 3: Jalankan Bot
 Jalankan perintah berikut untuk mengaktifkan bot:

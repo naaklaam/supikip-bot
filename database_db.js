@@ -2,7 +2,7 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const DB_PATH = path.join('/home/naaklaam/Supikip', 'speaki.db');
+const DB_PATH = path.join(process.cwd(), 'speaki.db');
 
 // Inisialisasi database SQLite3 secara otomatis jika belum ada
 export function initDatabase() {
