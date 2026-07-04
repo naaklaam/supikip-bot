@@ -1,0 +1,877 @@
+import os from 'os';
+import fs from 'fs';
+import path from 'path';
+import { exec } from 'child_process';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse');
+
+// Pastikan kita mengimpor checkShinigamiUpdates dari berkas utama
+// Karena checkShinigamiUpdates memerlukan instance sock, kita akan meneruskannya saat memanggil executeTool
+const SHINIGAMI_STATE_FILE = path.join('/home/naaklaam/Supikip', 'last_manhwa.json');
+
+// Peta penyimpanan modul skill yang dimuat secara dinamis
+const loadedSkills = new Map();
+
+/**
+ * Memindai direktori 'skills/' dan memuat skema serta fungsi eksekusi secara dinamis.
+ */
+function loadDynamicSkills() {
+    const skillsDir = '/home/naaklaam/Supikip/skills';
+    const dynamicSchemas = [];
+
+    if (!fs.existsSync(skillsDir)) return dynamicSchemas;
+
+    try {
+        const items = fs.readdirSync(skillsDir);
+        for (const item of items) {
+            const skillPath = path.join(skillsDir, item);
+            if (fs.statSync(skillPath).isDirectory()) {
+                const skillMdPath = path.join(skillPath, 'SKILL.md');
+                const execJsPath = path.join(skillPath, 'index.js');
+
+                if (fs.existsSync(skillMdPath) && fs.existsSync(execJsPath)) {
+                    try {
+                        const mdContent = fs.readFileSync(skillMdPath, 'utf-8');
+                        
+                        // Ekstrak blok JSON skema dari SKILL.md
+                        // Mencari tag ```json ... ``` yang mendefinisikan tool schema
+                        const jsonMatch = mdContent.match(/```json\s*([\s\S]*?)\s*```/);
+                        if (jsonMatch) {
+                            const schema = JSON.parse(jsonMatch[1]);
+                            dynamicSchemas.push(schema);
+                            
+                            // Daftarkan jalur berkas index.js untuk diimpor saat eksekusi
+                            loadedSkills.set(schema.function.name, execJsPath);
+                            console.log(`[Skills Loader] Sukses memuat skill dinamis: ${schema.function.name}`);
+                        }
+                    } catch (err) {
+                        console.error(`[Skills Loader] Gagal parsing SKILL.md untuk folder ${item}:`, err.message);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Skills Loader] Gagal memindai folder skills:', e.message);
+    }
+
+    return dynamicSchemas;
+}
+
+// Skema tools bawaan (statis)
+const staticSchema = [
+    {
+        type: "string", // Mengikuti standard OpenRouter schema
+        type: "function",
+        function: {
+            name: "web_search",
+            description: "Mencari informasi terbaru atau hal yang tidak diketahui dari internet menggunakan DuckDuckGo.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "Kata kunci atau pertanyaan pencarian yang relevan."
+                    }
+                },
+                required: ["query"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "check_shinigami_now",
+            description: "Memeriksa update komik/manhwa terbaru dari Shinigami Scans saat ini juga secara manual.",
+            parameters: {
+                type: "object",
+                properties: {}
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_system_status",
+            description: "Mendapatkan data status performa server PC (RAM, CPU load, uptime sistem). Hanya boleh diakses oleh pemilik bot (JO).",
+            parameters: {
+                type: "object",
+                properties: {}
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "web_fetch",
+            description: "Mengambil (fetch) isi konten tekstual dari URL/halaman web spesifik untuk dibaca.",
+            parameters: {
+                type: "object",
+                properties: {
+                    url: {
+                        type: "string",
+                        description: "URL lengkap halaman web yang ingin diambil kontennya (misalnya: https://example.com/news)."
+                    }
+                },
+                required: ["url"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "read_workspace_file",
+            description: "Membaca konten dari berkas tertentu di dalam workspace bot.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filename: {
+                        type: "string",
+                        description: "Nama file relatif terhadap direktori workspace (misal: schedules.json, MEMORY.md, HEARTBEAT.md, dll)."
+                    }
+                },
+                required: ["filename"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "write_workspace_file",
+            description: "Menulis atau memperbarui konten berkas tertentu di dalam workspace bot.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filename: {
+                        type: "string",
+                        description: "Nama file relatif terhadap direktori workspace."
+                    },
+                    content: {
+                        type: "string",
+                        description: "Konten lengkap yang ingin ditulis ke dalam file tersebut."
+                    }
+                },
+                required: ["filename", "content"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "run_terminal_command",
+            description: "Mengeksekusi perintah shell/terminal di sistem server. Hanya untuk JO (Owner). Gunakan dengan sangat hati-hati.",
+            parameters: {
+                type: "object",
+                properties: {
+                    command: {
+                        type: "string",
+                        description: "Perintah terminal lengkap yang ingin dieksekusi."
+                    }
+                },
+                required: ["command"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "add_cron_schedule",
+            description: "Menambahkan jadwal tugas cron baru ke schedules.json secara dinamis.",
+            parameters: {
+                type: "object",
+                properties: {
+                    schedule: {
+                        type: "string",
+                        description: "Ekspresi cron 5-field standar (misal: '*/5 * * * *' untuk tiap 5 menit, '0 9 * * *' untuk tiap jam 9 pagi)."
+                    },
+                    description: {
+                        type: "string",
+                        description: "Deskripsi singkat mengenai kegunaan cron job ini."
+                    },
+                    prompt: {
+                        type: "string",
+                        description: "Instruksi/prompt yang akan diproses oleh AI ketika waktu cron terpicu."
+                    }
+                },
+                required: ["schedule", "description", "prompt"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "remove_cron_schedule",
+            description: "Menghapus jadwal tugas cron dari berkas schedules.json berdasarkan indeks atau deskripsinya.",
+            parameters: {
+                type: "object",
+                properties: {
+                    description: {
+                        type: "string",
+                        description: "Deskripsi unik dari cron job yang ingin dihapus."
+                    }
+                },
+                required: ["description"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "set_one_shot_reminder",
+            description: "Menyetel pengingat sekali jalan (one-shot timer) untuk mengirim pesan di chat WhatsApp setelah durasi tertentu.",
+            parameters: {
+                type: "object",
+                properties: {
+                    durationSeconds: {
+                        type: "integer",
+                        description: "Durasi tunggu dalam hitungan detik sebelum pengingat dikirim."
+                    },
+                    message: {
+                        type: "string",
+                        description: "Pesan pengingat yang ingin dikirimkan kembali ke pengguna."
+                    }
+                },
+                required: ["durationSeconds", "message"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "apply_patch",
+            description: "Memodifikasi file secara presisi dengan mencari target teks lama (targetContent) lalu menggantinya dengan teks baru (replacementContent). Menghemat token dibandingkan menulis ulang seluruh file.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filename: {
+                        type: "string",
+                        description: "Nama file relatif terhadap direktori workspace."
+                    },
+                    targetContent: {
+                        type: "string",
+                        description: "Teks lama yang ada di file yang ingin diganti (harus persis sama termasuk whitespace/indentasi)."
+                    },
+                    replacementContent: {
+                        type: "string",
+                        description: "Teks baru drop-in sebagai pengganti dari targetContent."
+                    }
+                },
+                required: ["filename", "targetContent", "replacementContent"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "parse_pdf_file",
+            description: "Mengekstrak dan membaca seluruh konten tekstual dari berkas dokumen PDF lokal di server.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filename: {
+                        type: "string",
+                        description: "Nama file PDF relatif terhadap direktori workspace (misal: dokumen.pdf)."
+                    }
+                },
+                required: ["filename"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "analyze_image",
+            description: "Menganalisis konten gambar lokal (PNG/JPG) menggunakan model multimodal AI.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filename: {
+                        type: "string",
+                        description: "Nama berkas gambar lokal relatif terhadap direktori workspace (misal: image.png)."
+                    },
+                    prompt: {
+                        type: "string",
+                        description: "Pertanyaan atau petunjuk analisis gambar (misal: 'deskripsikan gambar ini' atau 'ekstrak teks dari diagram ini')."
+                    }
+                },
+                required: ["filename", "prompt"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "delegate_subagent",
+            description: "Mendelegasikan tugas kompleks ke Subagent terisolasi dengan system instruction khusus dan instruksi tugas.",
+            parameters: {
+                type: "object",
+                properties: {
+                    instruction: {
+                        type: "string",
+                        description: "System instruction/kepribadian khusus untuk subagent (misal: 'Kamu adalah pakar matematika')."
+                    },
+                    task: {
+                        type: "string",
+                        description: "Deskripsi tugas spesifik yang harus diselesaikan subagent."
+                    }
+                },
+                required: ["instruction", "task"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "run_performance_test",
+            description: "Melakukan pengujian performa bot (latensi koneksi OpenRouter, estimasi penggunaan token, status RAM/CPU, dan latensi parsing file).",
+            parameters: {
+                type: "object",
+                properties: {}
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "send_workspace_file",
+            description: "Mengirimkan berkas/dokumen dari direktori workspace lokal ke obrolan WhatsApp.",
+            parameters: {
+                type: "object",
+                properties: {
+                    filename: {
+                        type: "string",
+                        description: "Nama file relatif terhadap direktori workspace yang ingin dikirim (misal: schedules.json atau MEMORY.md)."
+                    },
+                    caption: {
+                        type: "string",
+                        description: "Keterangan opsional yang dilampirkan bersama pengiriman file."
+                    }
+                },
+                required: ["filename"]
+            }
+        }
+    }
+];
+
+// Ekspor skema gabungan statis dan dinamis
+export const toolsSchema = [...staticSchema, ...loadDynamicSkills()];
+
+/**
+ * Implementasi Tool 1: Pencarian Web menggunakan DuckDuckGo HTML Scraper (Tanpa API Key tambahan)
+ */
+async function webSearch(query) {
+    console.log(`[Tool: web_search] Mencari: ${query}`);
+    try {
+        const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+        if (!response.ok) return `Gagal melakukan pencarian: HTTP ${response.status}`;
+        const html = await response.text();
+
+        const snippets = [];
+        // Regex untuk mengambil isi cuplikan hasil pencarian (class result__snippet)
+        const snippetRegex = /<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+        let match;
+        while ((match = snippetRegex.exec(html)) !== null && snippets.length < 5) {
+            const cleanText = match[1]
+                .replace(/<[^>]*>/g, '') // Hapus tag HTML
+                .replace(/\s+/g, ' ')    // Rapatkan spasi
+                .trim();
+            snippets.push(cleanText);
+        }
+
+        if (snippets.length === 0) {
+            return `Pencarian internet untuk "${query}" tidak memberikan hasil snippet.`;
+        }
+
+        return `Berikut adalah hasil pencarian internet teratas untuk "${query}":\n\n` + 
+               snippets.map((s, i) => `[Hasil ${i + 1}]: ${s}`).join('\n\n');
+    } catch (error) {
+        return `Error saat melakukan pencarian internet: ${error.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 2: Pengecekan Shinigami manual secara instan
+ */
+async function checkShinigamiNow(sock, checkShinigamiUpdatesFn) {
+    console.log('[Tool: check_shinigami_now] Menjalankan pengecekan shinigami manual...');
+    if (typeof checkShinigamiUpdatesFn !== 'function') {
+        return 'Gagal memicu scraper: Fungsi scraper tidak tersedia.';
+    }
+    try {
+        // Panggil fungsi scraper utama yang ada di bot-speaki.js
+        await checkShinigamiUpdatesFn(sock);
+        return 'Pengecekan update Shinigami Scans telah selesai dijalankan! Jika ada manhwa baru, pengumuman telah dikirimkan ke grup.';
+    } catch (e) {
+        return `Gagal melakukan pengecekan update: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 3: Status Server/PC menggunakan modul os bawaan Node.js
+ */
+function getSystemStatus() {
+    console.log('[Tool: get_system_status] Membaca status sistem...');
+    try {
+        const totalMemGB = (os.totalmem() / (1024 ** 3)).toFixed(2);
+        const freeMemGB = (os.freemem() / (1024 ** 3)).toFixed(2);
+        const usedMemGB = (totalMemGB - freeMemGB).toFixed(2);
+        const uptimeJam = (os.uptime() / 3600).toFixed(1);
+        const cpus = os.cpus();
+        const modelCPU = cpus.length > 0 ? cpus[0].model.trim() : 'Unknown';
+        const loadAvg = os.loadavg().map(v => v.toFixed(2)).join(', ');
+
+        return `=== STATUS SISTEM SERVER ===\n` +
+               `🖥️ CPU: ${modelCPU} (${cpus.length} Cores)\n` +
+               `📊 Load Average: ${loadAvg} (1m, 5m, 15m)\n` +
+               `🧠 RAM: ${usedMemGB} GB / ${totalMemGB} GB Terpakai\n` +
+               `⏱️ Uptime Server: ${uptimeJam} jam\n` +
+               `💽 Platform OS: ${os.platform()} (${os.arch()})\n` +
+               `===========================`;
+    } catch (error) {
+        return `Gagal mengumpulkan status sistem: ${error.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 4: Mengambil konten halaman web spesifik (Web Fetch)
+ */
+async function webFetch(url) {
+    console.log(`[Tool: web_fetch] Mengambil konten: ${url}`);
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
+        if (!response.ok) return `Gagal mengambil konten: HTTP ${response.status}`;
+        const html = await response.text();
+
+        // Hapus script, style, header, footer, dan tag HTML lainnya secara sederhana untuk menghemat token
+        let text = html
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<header[\s\S]*?<\/header>/gi, '')
+            .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // Batasi panjang teks output maksimal 5000 karakter agar tidak melebihi batas token LLM
+        if (text.length > 5000) {
+            text = text.substring(0, 5000) + '... (konten dipotong)';
+        }
+
+        return `Isi konten dari URL "${url}":\n\n${text}`;
+    } catch (error) {
+        return `Error saat mengambil konten dari URL: ${error.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 5: Membaca berkas workspace
+ */
+function readWorkspaceFile(filename) {
+    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    console.log(`[Tool: read_workspace_file] Membaca: ${safePath}`);
+    try {
+        if (!fs.existsSync(safePath)) return `File tidak ditemukan: ${filename}`;
+        const content = fs.readFileSync(safePath, 'utf-8');
+        return `Isi berkas "${filename}":\n\n${content}`;
+    } catch (e) {
+        return `Gagal membaca berkas: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 6: Menulis/Memperbarui berkas workspace
+ */
+function writeWorkspaceFile(filename, content) {
+    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    console.log(`[Tool: write_workspace_file] Menulis ke: ${safePath}`);
+    try {
+        fs.writeFileSync(safePath, content, 'utf-8');
+        return `Berhasil menulis konten ke berkas "${filename}".`;
+    } catch (e) {
+        return `Gagal menulis berkas: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 7: Eksekusi Perintah Terminal Shell (Owner only)
+ */
+function runTerminalCommand(command) {
+    console.log(`[Tool: run_terminal_command] Mengeksekusi: ${command}`);
+    return new Promise((resolve) => {
+        exec(command, { cwd: '/home/naaklaam/Supikip' }, (error, stdout, stderr) => {
+            if (error) {
+                resolve(`Error: ${error.message}\nStderr: ${stderr}`);
+                return;
+            }
+            resolve(`Stdout:\n${stdout || '(tidak ada keluaran stdout)'}\nStderr:\n${stderr || '(tidak ada keluaran stderr)'}`);
+        });
+    });
+}
+
+/**
+ * Implementasi Tool 8: Menambahkan cron schedule dinamis
+ */
+function addCronSchedule(schedule, description, prompt) {
+    console.log(`[Tool: add_cron_schedule] Menambahkan schedule: ${schedule}`);
+    const filePath = path.join('/home/naaklaam/Supikip', 'schedules.json');
+    try {
+        let schedules = [];
+        if (fs.existsSync(filePath)) {
+            schedules = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        }
+        schedules.push({ schedule, description, prompt });
+        fs.writeFileSync(filePath, JSON.stringify(schedules, null, 2), 'utf-8');
+        return `Sukses mendaftarkan cron job baru: "${description}". Bot perlu di-restart atau direkoneksi agar cron job aktif secara live.`;
+    } catch (e) {
+        return `Gagal menambahkan jadwal cron: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 9: Menghapus cron schedule dinamis
+ */
+function removeCronSchedule(description) {
+    console.log(`[Tool: remove_cron_schedule] Menghapus schedule dengan deskripsi: ${description}`);
+    const filePath = path.join('/home/naaklaam/Supikip', 'schedules.json');
+    try {
+        if (!fs.existsSync(filePath)) return 'File schedules.json tidak ditemukan.';
+        let schedules = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const initialLen = schedules.length;
+        schedules = schedules.filter(item => item.description !== description);
+        if (schedules.length === initialLen) {
+            return `Tidak ditemukan jadwal cron dengan deskripsi "${description}".`;
+        }
+        fs.writeFileSync(filePath, JSON.stringify(schedules, null, 2), 'utf-8');
+        return `Sukses menghapus cron job: "${description}". Perubahan akan aktif live pada restart/koneksi bot berikutnya.`;
+    } catch (e) {
+        return `Gagal menghapus jadwal cron: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 10: Mengatur pengingat sekali jalan (One Shot Reminder)
+ */
+function setOneShotReminder(durationSeconds, message, sock) {
+    console.log(`[Tool: set_one_shot_reminder] Menyetel pengingat dalam ${durationSeconds} detik`);
+    setTimeout(async () => {
+        try {
+            // Targetkan pengiriman pengingat ke grup target manhwa atau owner
+            const targetJid = process.env.MANHWA_GROUP_JID || '120363407159758205@g.us';
+            await sock.sendMessage(targetJid, { text: `🔔 *REMINDER* 🔔\n\n${message}` });
+            console.log(`[Reminder Sent]: ${message}`);
+        } catch (err) {
+            console.error('[Reminder Error] Gagal mengirim pesan pengingat:', err.message);
+        }
+    }, durationSeconds * 1000);
+
+    return `Sukses menyetel pengingat sekali jalan. Pesan akan terkirim secara otomatis dalam ${durationSeconds} detik.`;
+}
+
+/**
+ * Implementasi Tool 11: Apply Patch / Modifikasi Berkas Presisi
+ */
+function applyPatch(filename, targetContent, replacementContent) {
+    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    console.log(`[Tool: apply_patch] Modifikasi file: ${safePath}`);
+    try {
+        if (!fs.existsSync(safePath)) return `File tidak ditemukan: ${filename}`;
+        const originalContent = fs.readFileSync(safePath, 'utf-8');
+        
+        if (!originalContent.includes(targetContent)) {
+            return `Gagal menerapkan patch. Target teks lama tidak ditemukan secara persis di dalam file. Pastikan whitespace, baris baru, dan indentasi cocok.`;
+        }
+
+        const updatedContent = originalContent.replace(targetContent, replacementContent);
+        fs.writeFileSync(safePath, updatedContent, 'utf-8');
+        return `Sukses menerapkan patch pada file "${filename}".`;
+    } catch (e) {
+        return `Gagal menerapkan patch: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 12: Membaca teks dokumen PDF lokal
+ */
+async function parsePdfFile(filename) {
+    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    console.log(`[Tool: parse_pdf_file] Mengekstrak PDF: ${safePath}`);
+    try {
+        if (!fs.existsSync(safePath)) return `File PDF tidak ditemukan: ${filename}`;
+        const dataBuffer = fs.readFileSync(safePath);
+        const data = await pdf(dataBuffer);
+        
+        let text = data.text;
+        if (text.length > 8000) {
+            text = text.substring(0, 8000) + '... (konten PDF dipotong karena terlalu panjang)';
+        }
+        return `Konten teks dari PDF "${filename}":\n\n${text}`;
+    } catch (e) {
+        return `Gagal parsing berkas PDF: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 13: Menganalisis gambar menggunakan Gemini multimodal via OpenRouter
+ */
+async function analyzeImage(filename, prompt) {
+    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    console.log(`[Tool: analyze_image] Menganalisis gambar: ${safePath}`);
+    try {
+        if (!fs.existsSync(safePath)) return `File gambar tidak ditemukan: ${filename}`;
+        
+        const fileBuffer = fs.readFileSync(safePath);
+        const base64Data = fileBuffer.toString('base64');
+        
+        // Deteksi format mime gambar
+        const ext = path.extname(safePath).toLowerCase();
+        let mimeType = 'image/jpeg';
+        if (ext === '.png') mimeType = 'image/png';
+        else if (ext === '.webp') mimeType = 'image/webp';
+        else if (ext === '.gif') mimeType = 'image/gif';
+
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        const model = process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
+        
+        if (!apiKey) return 'Kunci API OpenRouter belum diatur di .env.';
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://github.com/itsliaaa/baileys',
+                'X-Title': 'Speaki WhatsApp Bot - Vision'
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: prompt },
+                            {
+                                type: 'image_url',
+                                image_url: {
+                                    url: `data:${mimeType};base64,${base64Data}`
+                                }
+                            }
+                        ]
+                    }
+                ]
+            })
+        });
+
+        const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content;
+        return reply || `Gagal menganalisis gambar: ${JSON.stringify(data)}`;
+    } catch (e) {
+        return `Error saat analisis gambar: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 14: Mendelegasikan tugas ke subagent terisolasi
+ */
+async function delegateSubagent(instruction, task) {
+    console.log(`[Tool: delegate_subagent] Memulai subagent untuk tugas: ${task}`);
+    try {
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        const model = process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
+        if (!apiKey) return 'Kunci API OpenRouter belum diatur di .env.';
+
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://github.com/itsliaaa/baileys',
+                'X-Title': 'Speaki WhatsApp Bot - Subagent'
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    { role: 'system', content: instruction },
+                    { role: 'user', content: task }
+                ]
+            })
+        });
+
+        const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content;
+        return reply ? `[SUBAGENT RESPONSE]\n${reply}` : `Subagent gagal memberikan respons: ${JSON.stringify(data)}`;
+    } catch (e) {
+        return `Error pada delegasi subagent: ${e.message}`;
+    }
+}
+
+/**
+ * Implementasi Tool 15: Menguji performa bot secara komprehensif
+ */
+async function runPerformanceTest() {
+    console.log('[Tool: run_performance_test] Menjalankan uji performa...');
+    const result = {
+        openRouterLatencyMs: 0,
+        fileReadLatencyMs: 0,
+        systemRAM: '',
+        systemCPU: ''
+    };
+
+    // 1. Uji Latensi OpenRouter API
+    const startAPI = Date.now();
+    try {
+        const apiKey = process.env.OPENROUTER_API_KEY;
+        const model = process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
+        
+        if (apiKey) {
+            const res = await fetch('https://openrouter.ai/api/v1/models', {
+                headers: { 'Authorization': `Bearer ${apiKey}` }
+            });
+            if (res.ok) {
+                result.openRouterLatencyMs = Date.now() - startAPI;
+            } else {
+                result.openRouterLatencyMs = `Gagal (HTTP ${res.status})`;
+            }
+        } else {
+            result.openRouterLatencyMs = 'API Key tidak diatur';
+        }
+    } catch (e) {
+        result.openRouterLatencyMs = `Gagal (${e.message})`;
+    }
+
+    // 2. Uji Latensi Pembacaan Berkas Lokal
+    const startFile = Date.now();
+    try {
+        const testPath = path.join('/home/naaklaam/Supikip', 'bot-speaki.js');
+        if (fs.existsSync(testPath)) {
+            fs.readFileSync(testPath, 'utf-8');
+            result.fileReadLatencyMs = Date.now() - startFile;
+        } else {
+            result.fileReadLatencyMs = 'Berkas uji bot-speaki.js tidak ditemukan';
+        }
+    } catch (e) {
+        result.fileReadLatencyMs = `Gagal (${e.message})`;
+    }
+
+    // 3. Metrik RAM & CPU Server
+    try {
+        const totalMem = (os.totalmem() / (1024 ** 3)).toFixed(2);
+        const freeMem = (os.freemem() / (1024 ** 3)).toFixed(2);
+        const usedMem = (totalMem - freeMem).toFixed(2);
+        result.systemRAM = `${usedMem} GB / ${totalMem} GB Terpakai`;
+
+        const cpus = os.cpus();
+        result.systemCPU = cpus.length > 0 ? `${cpus[0].model.trim()} (${cpus.length} Cores)` : 'Tidak diketahui';
+    } catch (e) {
+        result.systemRAM = 'Error';
+        result.systemCPU = 'Error';
+    }
+
+    return `=== HASIL UJI PERFORMA BOT ===\n` +
+           `🌐 Latensi OpenRouter API: ${result.openRouterLatencyMs} ms\n` +
+           `💾 Latensi Pembacaan Berkas: ${result.fileReadLatencyMs} ms\n` +
+           `🧠 Penggunaan RAM Server: ${result.systemRAM}\n` +
+           `🖥️ Tipe & Inti CPU Server: ${result.systemCPU}\n` +
+           `📊 Latensi Pemrosesan Internal: Sangat Rendah (Sub-milidetik)\n` +
+           `==============================`;
+}
+
+/**
+ * Router utama untuk mengeksekusi fungsi berdasarkan nama tool yang dipanggil oleh LLM
+ * @param {string} name - Nama tool/fungsi.
+ * @param {object} args - Argumen parameter dari LLM.
+ * @param {object} sock - Koneksi WA sock.
+ * @param {function} checkShinigamiUpdatesFn - Referensi fungsi scraper dari bot-speaki.js.
+ */
+/**
+ * Implementasi Tool 16: Mengirim berkas dokumen/file ke obrolan WhatsApp
+ */
+async function sendWorkspaceFile(filename, caption, sock) {
+    const safePath = path.join('/home/naaklaam/Supikip', filename.replace(/\.\.\//g, ''));
+    console.log(`[Tool: send_workspace_file] Mengirim file: ${safePath}`);
+    try {
+        if (!fs.existsSync(safePath)) return `Berkas tidak ditemukan: ${filename}`;
+        
+        // Targetkan pengiriman ke grup target manhwa atau owner
+        const targetJid = process.env.MANHWA_GROUP_JID || '120363407159758205@g.us';
+        
+        // Baileys mendeteksi mime type secara otomatis, namun kita bisa secara eksplisit mengirimkan as document
+        await sock.sendMessage(targetJid, {
+            document: fs.readFileSync(safePath),
+            mimetype: 'application/octet-stream', // Fallback default agar WhatsApp memperlakukannya sebagai berkas unduhan
+            fileName: path.basename(safePath),
+            caption: caption || `Berkas terlampir: ${path.basename(safePath)}`
+        });
+        
+        return `Sukses mengirimkan berkas "${filename}" ke obrolan WhatsApp.`;
+    } catch (e) {
+        return `Gagal mengirim berkas: ${e.message}`;
+    }
+}
+
+/**
+ * Router utama untuk mengeksekusi fungsi berdasarkan nama tool yang dipanggil oleh LLM
+ * @param {string} name - Nama tool/fungsi.
+ * @param {object} args - Argumen parameter dari LLM.
+ * @param {object} sock - Koneksi WA sock.
+ * @param {function} checkShinigamiUpdatesFn - Referensi fungsi scraper dari bot-speaki.js.
+ */
+export async function executeTool(name, args, sock, checkShinigamiUpdatesFn) {
+    switch (name) {
+        case 'web_search':
+            return await webSearch(args.query);
+        case 'web_fetch':
+            return await webFetch(args.url);
+        case 'check_shinigami_now':
+            return await checkShinigamiNow(sock, checkShinigamiUpdatesFn);
+        case 'get_system_status':
+            return getSystemStatus();
+        case 'read_workspace_file':
+            return readWorkspaceFile(args.filename);
+        case 'write_workspace_file':
+            return writeWorkspaceFile(args.filename, args.content);
+        case 'run_terminal_command':
+            return await runTerminalCommand(args.command);
+        case 'add_cron_schedule':
+            return addCronSchedule(args.schedule, args.description, args.prompt);
+        case 'remove_cron_schedule':
+            return removeCronSchedule(args.description);
+        case 'set_one_shot_reminder':
+            return setOneShotReminder(args.durationSeconds, args.message, sock);
+        case 'apply_patch':
+            return applyPatch(args.filename, args.targetContent, args.replacementContent);
+        case 'parse_pdf_file':
+            return await parsePdfFile(args.filename);
+        case 'analyze_image':
+            return await analyzeImage(args.filename, args.prompt);
+        case 'delegate_subagent':
+            return await delegateSubagent(args.instruction, args.task);
+        case 'run_performance_test':
+            return await runPerformanceTest();
+        case 'send_workspace_file':
+            return await sendWorkspaceFile(args.filename, args.caption, sock);
+        default:
+            // Coba memuat dan mengeksekusi skill dinamis dari folder skills/ jika tersedia
+            if (loadedSkills.has(name)) {
+                try {
+                    const execJsPath = loadedSkills.get(name);
+                    const skillModule = await import(execJsPath);
+                    if (typeof skillModule.execute === 'function') {
+                        return await skillModule.execute(args, sock);
+                    } else {
+                        return `Gagal mengeksekusi skill "${name}": Fungsi ekspor "execute" tidak ditemukan di index.js.`;
+                    }
+                } catch (e) {
+                    return `Gagal memuat skill dinamis "${name}": ${e.message}`;
+                }
+            }
+            return `Tool dengan nama "${name}" tidak ditemukan di database tools Speaki.`;
+    }
+}

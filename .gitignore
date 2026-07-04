@@ -1,0 +1,30 @@
+# Dependensi Node.js
+node_modules/
+package-lock.json
+
+# Variabel Lingkungan & Kredensial (SANGAT KRUSIAL!)
+.env
+*.env
+speaki.db
+
+# Sesi & Cache WhatsApp Baileys (Berisi Token Autentikasi Rahasia)
+sesi_speaki/
+
+# File Log & State internal scraper shinigami
+last_manhwa.json
+*.log
+*.sqlite
+
+# Aset Stiker Lokal (Biar tidak menumpuk di repo GitHub)
+stiker_db/
+sticker_*.webp
+
+# File sampah sistem operasi / IDE
+.DS_Store
+.vscode/
+.gemini/
+.agents/
+tmp/
+*.tmp
+*.temp
+test_file.txt

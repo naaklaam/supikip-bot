@@ -1,0 +1,15 @@
+[Unit]
+Description=Speaki WhatsApp Bot Standalone Service
+After=network.target
+
+[Service]
+Type=simple
+User=naaklaam
+WorkingDirectory=/home/naaklaam/Supikip
+ExecStart=/home/linuxbrew/.linuxbrew/bin/node bot-speaki.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
