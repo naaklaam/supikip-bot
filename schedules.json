@@ -3,5 +3,10 @@
     "schedule": "0 9 * * *",
     "description": "Daily system status report",
     "prompt": "Jalankan system status check dan laporkan performa server kepada JO."
+  },
+  {
+    "schedule": "0 9 1 1 *",
+    "description": "Mengingatkan tagihan WhatsApp Premium sebelum tanggal 8 bulan depan",
+    "prompt": "Tolong ingatkan saya bahwa saya memiliki tagihan WhatsApp Premium yang harus dibayar sebelum tanggal 8 bulan depan."
   }
 ]

@@ -381,7 +381,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // Cache valid selama 5 menit
 
 /**
  * Fungsi untuk mengambil instruksi sistem (system prompt) terstruktur dari berkas-berkas markdown lokal.
- * Menggabungkan AGENTS.md, IDENTITY.md, SOUL.md, dan TOOLS.md mirip struktur agen OpenClaw.
+ * Menggabungkan CORE_IDENTITY.md dan TOOLS.md untuk menghemat token dan menghilangkan redundansi.
  */
 function getSystemInstruction() {
   const now = Date.now();
@@ -389,7 +389,7 @@ function getSystemInstruction() {
     return systemInstructionCache;
   }
 
-  const fileNames = ['AGENTS.md', 'IDENTITY.md', 'SOUL.md', 'TOOLS.md'];
+  const fileNames = ['CORE_IDENTITY.md', 'TOOLS.md'];
   let promptParts = [];
 
   for (const fileName of fileNames) {
@@ -411,11 +411,7 @@ function getSystemInstruction() {
     finalInstruction = 'Kamu adalah Speaki, asisten AI yang profesional, efisien, dan ketus. Jawab langsung pada inti masalah tanpa basa-basi.';
   } else {
     finalInstruction = `Kamu adalah asisten AI dengan instruksi terstruktur berikut yang menentukan perilaku, gaya bicara, identitas, dan batasanmu:\n\n` +
-      promptParts.join('\n') +
-      `\nAturan Perilaku (WAJIB DIPATUHI):
-1. EFISIENSI & LATENSI: Selalu berikan jawaban yang padat, akurat, dan langsung ke poin utama. Kurangi latensi kognitif dengan tidak menulis basa-basi atau perkenalan tidak perlu.
-2. NADA DINGIN / KETUS: Jawab dengan nada profesional, lugas, dingin, dan ketus. Tidak perlu bersikap ramah, menggunakan emoji yang berlebihan, atau menggunakan kata penutup informal seperti "Cuayo!".
-3. KUALITAS TEKNIS: Jika pengguna meminta kode pemrograman atau solusi teknis, pastikan solusinya optimal, bersih, dan siap dijalankan.`;
+      promptParts.join('\n');
   }
 
   // Update cache memori
@@ -514,7 +510,7 @@ async function getOpenRouterResponse(jid, sock) {
       // Kirim kembali riwayat obrolan yang sudah ditambahi output tool ke OpenRouter
       // Gunakan loop rekursif agar LLM bisa memanggil tool berulang kali jika diperlukan
       let activeToolsSchema = toolsSchema;
-      let maxIterations = 5;
+      let maxIterations = 10;
 
       while (maxIterations-- > 0) {
         const followUpMessages = [
@@ -723,6 +719,7 @@ async function startBot() {
       const isGroup = jid.endsWith('@g.us');
       const senderJid = msg.key.participant || msg.key.remoteJid;
       const senderNumber = senderJid.split('@')[0];
+      const senderName = msg.pushName || senderNumber;
       const ownerNumber = process.env.OWNER_NUMBER;
       const isOwner = (senderNumber === ownerNumber) || (senderName === 'JO');
 
@@ -900,13 +897,17 @@ async function startBot() {
           const mentionedJids = (msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [])
             .map(j => jidNormalizedUser(j));
 
-          const isReplyToBot = cleanReplyParticipant === cleanBotJid;
-          const hasTextMention = text.includes(`@${botNumber}`);
+          const isReplyToBot = cleanReplyParticipant === cleanBotJid || (cleanReplyParticipant && cleanReplyParticipant.startsWith('133526976512185'));
+          const hasTextMention = text.includes(`@${botNumber}`) || text.includes(`@${botJid.split('@')[0]}`) || text.includes('@133526976512185');
 
           // Deteksi nama panggilan biasa (speaki / supikip) di dalam teks (case-insensitive)
           const hasNameMention = lowercaseText.includes('speaki') || lowercaseText.includes('supikip');
 
-          const isMentioned = mentionedJids.includes(cleanBotJid) || hasTextMention || isReplyToBot || hasNameMention;
+          const isMentioned = mentionedJids.includes(cleanBotJid) ||
+            mentionedJids.some(j => j.split('@')[0] === botNumber || j.startsWith('133526976512185')) ||
+            hasTextMention ||
+            isReplyToBot ||
+            hasNameMention;
 
           console.log(`[Pesan Grup dari ${senderName} di ${jid}] (Mentioned: ${isMentioned}): ${text}`);
 

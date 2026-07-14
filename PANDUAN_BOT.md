@@ -21,10 +21,9 @@ Semua berkas bot berada di direktori project Speaki:
 
 ### 🧠 Berkas Prompting Terstruktur (Gaya OpenClaw)
 Kepribadian dan perilaku bot ditentukan secara modular melalui file-file markdown berikut yang digabungkan secara dinamis sebagai System Prompt:
-* **[AGENTS.md](file://./AGENTS.md)**: Aturan dasar sesi, penanganan grup chat, dan aturan pemeliharaan memori (Memory Pruning).
-* **[IDENTITY.md](file://./IDENTITY.md)**: Identitas agen (Nama, Peran, Vibe profesional, efisien, dan ketus).
-* **[SOUL.md](file://./SOUL.md)**: Inti kepribadian, nada bicara dingin/ketus tanpa basa-basi, dan batasan perilaku.
-* **[TOOLS.md](file://./TOOLS.md)**: Catatan lokal infrastruktur dan lingkungan kerja.
+* **[CORE_IDENTITY.md](file://./CORE_IDENTITY.md)**: Inti kepribadian, identitas agen, nada bicara dingin/ketus, batasan perilaku, dan aturan grup/memori yang dikonsolidasi.
+* **[AGENTS.md](file://./AGENTS.md)**: Referensi operasional singkat.
+* **[TOOLS.md](file://./TOOLS.md)**: Catatan lokal lingkungan kerja dan kontak grup.
 * **[HEARTBEAT.md](file://./HEARTBEAT.md)**: Berisi daftar tugas berkala yang dievaluasi LLM saat interval detak jantung berjalan.
 * **[MEMORY.md](file://./MEMORY.md)**: Catatan memori jangka panjang ringkas terstruktur (Wajib berada di bawah 30 baris).
 
@@ -80,12 +79,12 @@ Bot secara otomatis memindai direktori [skills/](file:///home/naaklaam/Supikip/s
 *   **[bitcoin_market_analyzer](file:///home/naaklaam/Supikip/skills/bitcoin_market_analyzer)**:
     *   *Fungsi*: `analyze_bitcoin_market`
     *   *Deskripsi*: Mengambil data pasar real-time spot Bitcoin (harga global, volume perdagangan spot 24 jam, fluktuasi harga terendah/tertinggi) dari API CoinGecko dan Binance Spot untuk bypass proteksi Cloudflare.
-*   **[creative_writer](file:///home/naaklaam/Supikip/skills/creative_writer)**:
-    *   *Fungsi*: `generate_creative_content`
-    *   *Deskripsi*: Menghasilkan cerita fiksi pendek berkualitas tinggi (cerpen) dengan plot twist yang menarik atau puisi indah kaya metafora berdasarkan genre dan tema kustom.
 *   **[ocr_extractor](file:///home/naaklaam/Supikip/skills/ocr_extractor)**:
     *   *Fungsi*: `extract_text_from_image`
     *   *Deskripsi*: Mengekstrak teks secara akurat dari berkas gambar lokal menggunakan teknologi Gemini Vision API.
+*   **[serpapi_quota_manager](file:///home/naaklaam/Supikip/skills/serpapi_quota_manager)**:
+    *   *Fungsi*: `manage_serpapi_quota`
+    *   *Deskripsi*: Memantau kuota pencarian SerpAPI saat ini atau memperbarui nilai usage secara manual.
 *   **[sticker_responder](file:///home/naaklaam/Supikip/skills/sticker_responder)**:
     *   *Fungsi*: `send_sticker_response`
     *   *Deskripsi*: Mengirimkan stiker WhatsApp biner mentah secara acak berdasarkan tag kategori (ekspresi) dari database SQLite lokal.
