@@ -1,4 +1,4 @@
-import makeWASocket, { useMultiFileAuthState, DisconnectReason, jidNormalizedUser, downloadMediaMessage } from '@itsliaaa/baileys';
+import makeWASocket, { useMultiFileAuthState, DisconnectReason, jidNormalizedUser, downloadMediaMessage, Browsers } from '@itsliaaa/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import fs from 'fs';
@@ -425,9 +425,24 @@ function getSystemInstruction() {
  * Fungsi untuk mengirim permintaan chat completion ke API OpenRouter.
  * @param {string} jid - WhatsApp ID pengguna untuk membedakan riwayat obrolan.
  */
+/**
+ * Truncate teks jika terlalu panjang agar tidak memakan token berlebihan.
+ */
+function truncateOutput(text, maxLength = 3000) {
+  if (typeof text !== 'string') return text;
+  if (text.length > maxLength) {
+    return text.substring(0, maxLength) + '\n\n[Output dipotong karena terlalu panjang untuk efisiensi token]';
+  }
+  return text;
+}
+
+/**
+ * Fungsi untuk mengirim permintaan chat completion ke API OpenRouter.
+ * @param {string} jid - WhatsApp ID pengguna untuk membedakan riwayat obrolan.
+ */
 async function getOpenRouterResponse(jid, sock) {
   if (!OPENROUTER_API_KEY) {
-    return 'Waduh! Kunci API OpenRouter belum diatur di file .env nya! Cuayo...';
+    return 'Waduh! Kunci API OpenRouter belum diatur di file .env nya!';
   }
 
   const now = Date.now();
@@ -442,169 +457,94 @@ async function getOpenRouterResponse(jid, sock) {
   const history = chatData.messages;
   const systemInstruction = getSystemInstruction();
 
-  // Gabungkan instruksi sistem dengan riwayat
-  const messages = [
+  // Susun array messages sementara (ephemeral) untuk siklus request saat ini
+  let currentMessages = [
     { role: 'system', content: systemInstruction },
     ...history
   ];
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://github.com/itsliaaa/baileys',
-        'X-Title': 'Speaki WhatsApp Bot'
-      },
-      body: JSON.stringify({
-        model: MODEL_NAME,
-        messages: messages,
-        tools: toolsSchema
-      })
-    });
+    let maxIterations = 5; // Maksimal 5 iterasi tool call per turn
 
-    const data = await response.json();
-    const message = data.choices?.[0]?.message;
-
-    if (!message) {
-      console.error('Respon OpenRouter kosong atau error:', data);
-      return 'Eh? Speaki bingung... API OpenRouter-nya ngasih jawaban kosong nih. Cuayo...';
-    }
-
-    // Jika LLM meminta pemanggilan tool (function calling)
-    if (message.tool_calls && message.tool_calls.length > 0) {
-      console.log(`[OpenRouter Tool Call] LLM meminta pemanggilan ${message.tool_calls.length} tool(s).`);
-
-      // Simpan request asisten yang berisi tool_calls ke dalam history
-      history.push({
-        role: 'assistant',
-        content: message.content || null,
-        tool_calls: message.tool_calls
+    while (maxIterations-- > 0) {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://github.com/itsliaaa/baileys',
+          'X-Title': 'Speaki WhatsApp Bot'
+        },
+        body: JSON.stringify({
+          model: MODEL_NAME,
+          messages: currentMessages,
+          tools: toolsSchema,
+          max_tokens: 1500 // Batas aman output untuk mencegah runaway/looping generation
+        })
       });
-      if (history.length > 10) history.shift();
 
-      // Jalankan setiap tool call yang diminta
-      for (const toolCall of message.tool_calls) {
-        const name = toolCall.function.name;
-        let args = {};
-        try {
-          args = JSON.parse(toolCall.function.arguments || '{}');
-        } catch (e) {
-          console.error(`Gagal parsing argumen untuk tool ${name}:`, e.message);
-        }
+      const data = await response.json();
+      const message = data.choices?.[0]?.message;
 
-        // Eksekusi tool
-        const toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates);
+      if (!message) {
+        console.error('Respon OpenRouter kosong atau error:', data);
+        return 'Eh? Speaki bingung... API OpenRouter ngasih jawaban kosong.';
+      }
 
-        // Masukkan hasil eksekusi tool ke dalam history
-        history.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          name: name,
-          content: toolOutput
+      // Jika LLM meminta pemanggilan tool (function calling)
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        console.log(`[OpenRouter Tool Call] LLM meminta pemanggilan ${message.tool_calls.length} tool(s).`);
+
+        // Masukkan assistant message (berisi tool_calls) ke currentMessages run ini
+        currentMessages.push({
+          role: 'assistant',
+          content: message.content || null,
+          tool_calls: message.tool_calls
         });
-        if (history.length > 10) history.shift();
-      }
 
-      // Kirim kembali riwayat obrolan yang sudah ditambahi output tool ke OpenRouter
-      // Gunakan loop rekursif agar LLM bisa memanggil tool berulang kali jika diperlukan
-      let activeToolsSchema = toolsSchema;
-      let maxIterations = 10;
+        // Eksekusi setiap tool
+        for (const toolCall of message.tool_calls) {
+          const name = toolCall.function.name;
+          let args = {};
+          try {
+            args = JSON.parse(toolCall.function.arguments || '{}');
+          } catch (e) {
+            console.error(`Gagal parsing argumen untuk tool ${name}:`, e.message);
+          }
 
-      while (maxIterations-- > 0) {
-        const followUpMessages = [
-          { role: 'system', content: systemInstruction },
-          ...history
-        ];
+          let toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates);
+          toolOutput = truncateOutput(toolOutput, 3000); // Potong output raksasa agar token input tetap hemat
 
-        try {
-          const secondResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-              'Content-Type': 'application/json',
-              'HTTP-Referer': 'https://github.com/itsliaaa/baileys',
-              'X-Title': 'Speaki WhatsApp Bot'
-            },
-            body: JSON.stringify({
-              model: MODEL_NAME,
-              messages: followUpMessages,
-              tools: activeToolsSchema // PENTING: Selalu kirimkan skema agar tidak terjadi UNEXPECTED_TOOL_CALL
-            })
+          currentMessages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: name,
+            content: toolOutput
           });
-
-          const secondData = await secondResponse.json();
-          const secondMessage = secondData.choices?.[0]?.message;
-
-          if (!secondMessage) {
-            console.error('Respon final setelah tool call kosong:', secondData);
-            return 'Ugh! Gagal mendapatkan respon percakapan setelah eksekusi tool. Cuayo...';
-          }
-
-          // Jika LLM meminta pemanggilan tool lain secara berantai
-          if (secondMessage.tool_calls && secondMessage.tool_calls.length > 0) {
-            console.log(`[OpenRouter Tool Call Chain] LLM meminta pemanggilan berantai ${secondMessage.tool_calls.length} tool(s).`);
-
-            history.push({
-              role: 'assistant',
-              content: secondMessage.content || null,
-              tool_calls: secondMessage.tool_calls
-            });
-            if (history.length > 10) history.shift();
-
-            for (const toolCall of secondMessage.tool_calls) {
-              const name = toolCall.function.name;
-              let args = {};
-              try {
-                args = JSON.parse(toolCall.function.arguments || '{}');
-              } catch (e) {
-                console.error(`Gagal parsing argumen untuk tool berantai ${name}:`, e.message);
-              }
-
-              const toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates);
-
-              history.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                name: name,
-                content: toolOutput
-              });
-              if (history.length > 10) history.shift();
-            }
-            // Lanjutkan iterasi loop while untuk mengirim ulang output tool baru
-            continue;
-          }
-
-          // Jika respons berupa teks biasa (akhir dari rantai keputusan)
-          const finalReply = secondMessage.content;
-          if (finalReply) {
-            history.push({ role: 'assistant', content: finalReply });
-            if (history.length > 10) history.shift();
-            return finalReply;
-          } else {
-            return 'Ugh! Gagal mendapatkan respons teks akhir dari model.';
-          }
-        } catch (err) {
-          console.error('Error saat follow-up tool call ke OpenRouter:', err);
-          return 'Waduh, error saat menyusun balasan akhir setelah pakai tool. Cuayo...';
         }
-      }
-      return 'Batas iterasi pemanggilan tool berantai terlampaui.';
-    } else {
-      // Jika respons berupa teks biasa (tanpa pemanggilan tool)
-      const reply = message.content;
-      if (reply) {
-        history.push({ role: 'assistant', content: reply });
-        if (history.length > 10) history.shift();
-        return reply;
+
+        // Lanjutkan iterasi loop while untuk meminta balasan LLM atas hasil tool
+        continue;
       } else {
-        return 'Eh? Speaki bingung... API OpenRouter-nya ngasih jawaban kosong nih. Cuayo...';
+        // Teks balasan akhir dari LLM
+        const finalReply = message.content;
+        if (finalReply) {
+          // Simpan balasan akhir ke history permanen (hanya percakapan user-assistant bersih)
+          history.push({ role: 'assistant', content: finalReply });
+          // Pangkas riwayat jika lebih dari 10 pesan
+          while (history.length > 10) history.shift();
+
+          return finalReply;
+        } else {
+          return 'Ugh! Gagal mendapatkan respon percakapan.';
+        }
       }
     }
+
+    return 'Batas iterasi pemanggilan tool berantai terlampaui.';
   } catch (error) {
     console.error('Error saat menghubungi OpenRouter:', error);
-    return 'Aduh! Gagal konek ke OpenRouter nih. Coba cek internet atau kuota API-nya ya! Cuayo...';
+    return 'Aduh! Gagal konek ke OpenRouter. Coba cek internet atau kuota API-nya!';
   }
 }
 
@@ -620,14 +560,34 @@ async function startBot() {
   const sock = makeWASocket({
     auth: state,
     printQRInTerminal: true, // Menampilkan QR Code di terminal untuk scan
+    browser: Browsers.ubuntu('Chrome'), // Profil browser resmi Ubuntu Chrome untuk mencegah penolakan penautan
     logger: pino({ level: 'silent' }) // Mematikan log bawaan yang terlalu bising
   });
 
   sock.ev.on('creds.update', saveCreds);
 
+  let pairingCodeRequested = false;
+
   // Mengelola siklus hidup koneksi WebSocket WhatsApp
-  sock.ev.on('connection.update', (update) => {
+  sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
+
+    // Dukungan Pairing Code (8 digit) secara stabil saat WebSocket aktif
+    if (qr && !sock.authState.creds.registered && !pairingCodeRequested) {
+      pairingCodeRequested = true;
+      const phoneNumber = (process.env.BOT_NUMBER || process.env.OWNER_NUMBER || '6283891270115').replace(/[^0-9]/g, '');
+      try {
+        const code = await sock.requestPairingCode(phoneNumber);
+        console.log('\n==================================================');
+        console.log(`🔑 KODE PAIRING WHATSAPP AKTIF (8 DIGIT): ${code}`);
+        console.log(`Nomor HP: ${phoneNumber}`);
+        console.log('Petunjuk di HP: Buka WhatsApp -> Perangkat Tertaut -> Tautkan dengan Nomor Telepon');
+        console.log('==================================================\n');
+      } catch (err) {
+        console.error('[Pairing Code Error] Gagal meminta Pairing Code:', err.message);
+        pairingCodeRequested = false;
+      }
+    }
 
     if (qr) {
       console.log('\n==================================================');
@@ -723,7 +683,8 @@ async function startBot() {
       const ownerNumber = process.env.OWNER_NUMBER;
       const isOwner = (senderNumber === ownerNumber) || (senderName === 'JO');
 
-      // Deteksi jika Owner mengirim stiker untuk dijadikan bahan database
+      /*
+      // Deteksi jika Owner mengirim stiker untuk dijadikan bahan database (DINONAKTIFKAN SEMENTARA)
       if (sticker && isOwner) {
         console.log(`[Sticker Handler] Owner mengirim stiker. Mengunduh secara otomatis...`);
         try {
@@ -743,6 +704,7 @@ async function startBot() {
           await sock.sendMessage(jid, { text: `Gagal memproses berkas stiker: ${err.message}` });
         }
       }
+      */
 
       // Cari tahu JID bot sendiri dan nomornya (dideklarasikan di level teratas handler pesan masuk)
       const botJid = jidNormalizedUser(sock.user.id);

@@ -5,4 +5,4 @@ Lihat instruksi lengkap identitas dan perilaku di [CORE_IDENTITY.md](file:///hom
 ## Quick Reference
 - **Memory File:** `MEMORY.md` (Main session only, < 30 baris).
 - **Daily Logs:** `memory/YYYY-MM-DD.md`.
-- **System Service:** `supikip.service`.
+- **System Service:** `speaki-bot.service`.
