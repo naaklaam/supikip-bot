@@ -1,36 +1,43 @@
-# Dependensi Node.js
-node_modules/
-package-lock.json
+# --------------------------------------------------
+# PRIVASI & FOLDER TERTUTUP (DIABAIKAN OLEH GIT)
+# --------------------------------------------------
+private_data/
+private/
+bot_workspace/*
+!bot_workspace/.gitkeep
+temp_docs/
+downloads/
 
-# Variabel Lingkungan & Kredensial (SANGAT KRUSIAL!)
+# Variabel Lingkungan & Kredensial Rahasia
 .env
 *.env
-speaki.db
 cookies.txt
 *.cookies
-temp_docs/
 
-# Sesi & Cache WhatsApp Baileys (Berisi Token Autentikasi Rahasia)
+# Database & State Runtime Bot
+speaki.db
+*.sqlite
+*.db
+last_manhwa.json
+serpapi_quota.json
 sesi_speaki/
 
-# File Log & State internal scraper shinigami
-last_manhwa.json
-*.log
-*.sqlite
+# Dependensi & Pustaka Lokal
+node_modules/
+package-lock.json
+baileys/
 
-# Aset Stiker Lokal (Biar tidak menumpuk di repo GitHub)
+# Aset Stiker & File Log
 stiker_db/
 sticker_*.webp
+*.log
 
-# File sampah sistem operasi / IDE
-.DS_Store
-.vscode/
+# Cache Tools / IDE / Internal
+.zread/
 .gemini/
 .agents/
+.vscode/
+.DS_Store
 tmp/
 *.tmp
 *.temp
-test_file.txt
-
-# repo orang
-baileys/
