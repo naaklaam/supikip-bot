@@ -7,7 +7,8 @@ import dotenv from 'dotenv';
 import qrcode from 'qrcode-terminal';
 import { toolsSchema, executeTool } from './tools.js';
 import cron from 'node-cron';
-import { initDatabase, registerSticker, saveChatMessage, getRelevantMemoryContext } from './database_db.js';
+import { initDatabase, registerSticker, saveChatMessage, getRelevantMemoryContext, getRandomStickerByTag } from './database_db.js';
+import { downloadAndRegisterMangaSticker } from './manga_sticker_helper.js';
 import { extractArticleUrl, unfurlAndSummarizeUrl } from './link_unfurler.js';
 
 // Memuat variabel lingkungan dari file .env
@@ -249,6 +250,29 @@ async function checkShinigamiUpdates(sock) {
         if (!MANHWA_GROUP_JID) {
           console.log(`[Shinigami Scraper] MANHWA_GROUP_JID belum diatur di .env, melempar pesan WA.`);
           continue;
+        }
+
+        // Ambil atau unduh stiker cover manga
+        let stickerRow = await getRandomStickerByTag(`manga_${mangaId}`);
+        if (!stickerRow) {
+          const coverUrl = item.cover_portrait_url || item.cover_image_url;
+          if (coverUrl) {
+            console.log(`[Shinigami Scraper] Stiker belum ada. Mengunduh cover untuk "${title}"...`);
+            await downloadAndRegisterMangaSticker(mangaId, coverUrl, title);
+            stickerRow = await getRandomStickerByTag(`manga_${mangaId}`);
+          }
+        }
+
+        if (stickerRow) {
+          const stickerPath = path.join(process.cwd(), 'stiker_db', stickerRow.filename);
+          if (fs.existsSync(stickerPath)) {
+            try {
+              await sock.sendMessage(MANHWA_GROUP_JID, { sticker: fs.readFileSync(stickerPath) });
+              console.log(`[Shinigami Scraper] Stiker cover terkirim ke WA untuk: ${title}`);
+            } catch (stickerErr) {
+              console.error(`[Shinigami Scraper] Gagal mengirim stiker cover untuk "${title}":`, stickerErr.message);
+            }
+          }
         }
 
         const msg =

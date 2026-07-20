@@ -7,6 +7,7 @@
 ### 🧩 Active Capabilities & Features
 - **Social Media Downloader**: `yt-dlp` (`~/Downloads/SocialMedia/[Platform]`), quoted reply WA, `cookies.txt` auto-injected.
 - **Document Processor**: Auto-parse `.txt`, `.md`, `.json`, `.csv`, `.xlsx`, `.docx`, `.pdf` from WA to LLM context.
+- **Manga Cover Sticker**: Auto-download, convert to WebP sticker via ImageMagick, save in DB, and send on updates.
 
 ### 🎮 JO's Trickcal: Chibi Go! Roster
 - **Owned**: Renewa (S-Tier carry), Haley (T1 AoE), Kommy (T1 Tank), Gabia (T1 Shield), Meluna (T2 Healer), Velvet (T2 Tank).
