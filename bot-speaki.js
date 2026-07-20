@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 import qrcode from 'qrcode-terminal';
 import { toolsSchema, executeTool } from './tools.js';
 import cron from 'node-cron';
-import { initDatabase, registerSticker } from './database_db.js';
+import { initDatabase, registerSticker, saveChatMessage, getRelevantMemoryContext } from './database_db.js';
 
 // Memuat variabel lingkungan dari file .env
 dotenv.config();
@@ -454,12 +454,18 @@ async function getOpenRouterResponse(jid, sock, msg) {
     chatData.lastAccessed = now;
   }
 
-  const history = chatData.messages;
-  const systemInstruction = getSystemInstruction();
+  // Dapatkan memori FTS5 yang relevan dengan pesan pengguna dari SQLite
+  const lastUserMsg = history.slice().reverse().find(m => m.role === 'user')?.content || '';
+  const ftsMemoryContext = await getRelevantMemoryContext(lastUserMsg, jid);
+
+  let finalSystemInstruction = systemInstruction;
+  if (ftsMemoryContext) {
+    finalSystemInstruction += ftsMemoryContext;
+  }
 
   // Susun array messages sementara (ephemeral) untuk siklus request saat ini
   let currentMessages = [
-    { role: 'system', content: systemInstruction },
+    { role: 'system', content: finalSystemInstruction },
     ...history
   ];
 
@@ -718,7 +724,7 @@ async function startBot() {
       if (text) {
 
         // Static Router: Cek jika pengguna meminta menu tools secara langsung
-        const isCallingBot = lowercaseText.includes('speaki') || lowercaseText.includes('supikip');
+        const isCallingBot = lowercaseText.includes('speaki') || lowercaseText.includes('supikip') || lowercaseText.includes('spikip') || lowercaseText.includes('spiki');
         if (isCallingBot && lowercaseText.includes('menu')) {
           console.log(`[Static Route: Menu] Mengirim menu fitur ke ${jid}`);
           const menuText = `⚙️ *Speaki Agent System Menu* ⚙️\n\n` +
@@ -860,6 +866,9 @@ async function startBot() {
       }
 
       if (promptText || documentInfo) {
+        // Simpan pesan masuk ke database SQLite (Pencatatan Long-Term Memory FTS5)
+        saveChatMessage(jid, senderName, senderJid, promptText || 'Mengirim berkas', 0);
+
         // Format isi pesan agar LLM tahu siapa yang berbicara dan apa isi dokumen yang dikirim
         let formattedMessage = `[${senderName}]: ${promptText}`;
         if (documentInfo) {
@@ -927,6 +936,9 @@ async function startBot() {
 
           // Dapatkan balasan dari OpenRouter dengan dukungan pemanggilan tools
           const replyText = await getOpenRouterResponse(jid, sock, msg);
+
+          // Simpan balasan bot ke database SQLite (Pencatatan Long-Term Memory FTS5)
+          saveChatMessage(jid, 'Speaki ⚙️🤖', botJid, replyText, 1);
 
           // Kirim balasan ke pengguna (diquote ke pesan pengirim)
           await sock.sendMessage(jid, { text: replyText }, { quoted: msg });

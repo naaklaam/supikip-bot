@@ -91,6 +91,9 @@ Bot secara otomatis memindai direktori [skills/](file:///home/naaklaam/Supikip/s
 *   **[social_media_downloader](file:///home/naaklaam/Supikip/skills/social_media_downloader)**:
     *   *Fungsi*: `download_social_media`
     *   *Deskripsi*: Mengunduh media/video/audio dari YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit, Pinterest, dll. menggunakan `yt-dlp`. Berkas disimpan di `~/Downloads/SocialMedia/[Platform]` dan otomatis dikirimkan kembali ke obrolan WhatsApp peminta sebagai balasan kutipan (*quoted reply*). Otomatis menyuntikkan `cookies.txt` dari `~/Downloads/cookies.txt` untuk media yang membutuhkan autentikasi login (misal Instagram Reels).
+*   **[long_term_memory](file:///home/naaklaam/Supikip/skills/long_term_memory)**:
+    *   *Fungsi*: `search_long_term_memory`
+    *   *Deskripsi*: Pencarian berbasis SQLite FTS5 (Full-Text Search) untuk mengingat pesan obrolan lampau berbulan-bulan lalu atau fakta jangka panjang yang tersimpan di database `speaki.db`.
 
 ### Cara Menambahkan Skill Baru:
 Buat folder baru di bawah `skills/` (misal: `skills/hello_world/`) yang wajib berisi:
@@ -123,17 +126,14 @@ Buat folder baru di bawah `skills/` (misal: `skills/hello_world/`) yang wajib be
 
 ---
 
-## 📥 Pengolah Stiker & Database SQLite (`speaki.db`)
+## 🧠 Sistem Memori Jangka Panjang SQLite FTS5 (`speaki.db`)
 
-Bot dilengkapi dengan database relasional lokal serverless **SQLite3** (`speaki.db`) untuk pengelolaan aset stiker dan statistik penggunaan secara dinamis.
+Bot dilengkapi dengan arsitektur pencarian memori jangka panjang berlatensi sub-milidetik menggunakan **SQLite FTS5 (Full-Text Search)**:
 
-### 1. Sticker Database (`/stiker_db/`):
-*   **Penyimpanan**: Stiker yang dikirim oleh Owner (`JO`) diunduh secara otomatis dan disimpan rapi di dalam subfolder [stiker_db/](file:///home/naaklaam/Supikip/stiker_db).
-*   **Registrasi Database**: Setiap stiker baru secara otomatis dicatat ke tabel `stickers` di database SQLite dengan properti `filename`, `tag` (default: `'general'`), `added_by`, dan pelacak `usage_count`.
-*   **Statistik Penggunaan**: Setiap kali LLM memicu tool `send_sticker_response`, jumlah total penggunaan stiker tersebut akan bertambah secara otomatis di database.
-*   **Target Pengiriman**: Secara *chaos* statis, stiker respon yang dipicu LLM akan langsung ditembak masuk ke dua grup target sekaligus secara paralel:
-    1.  `120363407159758205@g.us` (Grup Manhwa)
-    2.  `120363322107836319@g.us` (Grup Punini)
+*   **Pencatatan Pesan Otomatis**: Setiap pesan masuk dan balasan bot secara otomatis tersimpan dan diindeks di tabel `chat_messages_history` & virtual table FTS5 `messages_fts`.
+*   **Penyimpanan Fakta Jangka Panjang**: Tabel `long_term_memories` & `memories_fts` menyimpan fakta/preferensi jangka panjang.
+*   **Pencarian Relevan Otomatis (Zero Context Waste)**: Saat pengguna mengirim pertanyaan ke bot, sistem FTS5 secara otomatis mencari riwayat/fakta terkait dalam kurun waktu berbulan-bulan lalu dan menyuntikkan fragmen memori yang relevan saja ke prompt LLM.
+*   **Keuntungan Utama**: `MEMORY.md` tetap sangat ringkas (< 30 baris), context window hemat, latensi balasan tetap sub-detik, namun bot dapat mengingat topik pembahasan lampau secara akurat.
 
 ---
 
