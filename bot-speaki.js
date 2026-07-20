@@ -526,7 +526,7 @@ async function getOpenRouterResponse(jid, sock, msg) {
   const lastUserMsg = history.slice().reverse().find(m => m.role === 'user')?.content || '';
   const ftsMemoryContext = await getRelevantMemoryContext(lastUserMsg, jid);
 
-  let finalSystemInstruction = systemInstruction;
+  let finalSystemInstruction = getSystemInstruction();
   if (ftsMemoryContext) {
     finalSystemInstruction += ftsMemoryContext;
   }
