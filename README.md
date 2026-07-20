@@ -94,6 +94,9 @@ Bot secara otomatis memindai direktori [skills/](file:///home/naaklaam/Supikip/s
 *   **[long_term_memory](file:///home/naaklaam/Supikip/skills/long_term_memory)**:
     *   *Fungsi*: `search_long_term_memory`
     *   *Deskripsi*: Pencarian berbasis SQLite FTS5 (Full-Text Search) untuk mengingat pesan obrolan lampau berbulan-bulan lalu atau fakta jangka panjang yang tersimpan di database `speaki.db`.
+*   **[multi_agent_delegator](file:///home/naaklaam/Supikip/skills/multi_agent_delegator)**:
+    *   *Fungsi*: `delegate_parallel_subagents`
+    *   *Deskripsi*: Mendelegasikan beberapa sub-tugas kompleks sekaligus ke beberapa sub-agent terisolasi secara simultan (`Promise.all`) dengan peran/instruksi terpisah.
 
 ### Cara Menambahkan Skill Baru:
 Buat folder baru di bawah `skills/` (misal: `skills/hello_world/`) yang wajib berisi:
