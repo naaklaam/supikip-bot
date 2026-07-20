@@ -8,6 +8,7 @@ import qrcode from 'qrcode-terminal';
 import { toolsSchema, executeTool } from './tools.js';
 import cron from 'node-cron';
 import { initDatabase, registerSticker, saveChatMessage, getRelevantMemoryContext } from './database_db.js';
+import { extractArticleUrl, unfurlAndSummarizeUrl } from './link_unfurler.js';
 
 // Memuat variabel lingkungan dari file .env
 dotenv.config();
@@ -933,6 +934,18 @@ async function startBot() {
         if (shouldReply) {
           // Tampilkan indikator "sedang mengetik" di WhatsApp agar bot terasa lebih responsif
           await sock.sendPresenceUpdate('composing', jid);
+
+          // Pemicu Otomatis Smart Link Unfurler untuk Artikel/Berita yang dibagikan
+          const articleUrl = extractArticleUrl(promptText);
+          if (articleUrl) {
+            unfurlAndSummarizeUrl(articleUrl).then(summary => {
+              if (summary) {
+                sock.sendMessage(jid, { text: summary }, { quoted: msg });
+              }
+            }).catch(err => {
+              console.error('[Link Unfurler Error] Failed:', err.message);
+            });
+          }
 
           // Dapatkan balasan dari OpenRouter dengan dukungan pemanggilan tools
           const replyText = await getOpenRouterResponse(jid, sock, msg);

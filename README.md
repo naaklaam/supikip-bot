@@ -143,6 +143,16 @@ Bot dilengkapi dengan arsitektur pencarian memori jangka panjang berlatensi sub-
 
 ---
 
+## 📰 Smart Link Unfurler Engine (`link_unfurler.js`)
+
+Bot memiliki modul deteksi & pembedah URL artikel berita/blog otomatis ([link_unfurler.js](file:///home/naaklaam/Supikip/link_unfurler.js)):
+
+*   **Deteksi Otomatis**: Setiap kali tautan artikel/berita (misal: `https://detik.com/...`, `https://medium.com/...`, HackerNews, blog, dll.) dibagikan di obrolan chat/grup, sistem secara otomatis mengekstrak URL tersebut.
+*   **Ringkasan 3 Poin Utama**: Membedah teks artikel dalam latensi cepat (~500ms) dan menghasilkan balasan kutipan berisi judul artikel serta **3 poin utama paling krusial** dalam Bahasa Indonesia.
+*   **Mengabaikan Link Media**: Secara otomatis mengabaikan tautan video/sosmed (Instagram Reels, TikTok, YouTube) agar tidak mengganggu skill downloader media.
+
+---
+
 ## 📄 Fitur Pengolah Dokumen WhatsApp (`document_processor.js`)
 
 Bot memiliki sistem pengolahan dokumen terintegrasi ([document_processor.js](file:///home/naaklaam/Supikip/document_processor.js)) yang mampu mengunduh, membaca, dan menganalisis berkas dokumen yang dikirimkan pengguna ke obrolan WhatsApp:
