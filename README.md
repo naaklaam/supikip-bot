@@ -97,6 +97,9 @@ Bot secara otomatis memindai direktori [skills/](file:///home/naaklaam/Supikip/s
 *   **[multi_agent_delegator](file:///home/naaklaam/Supikip/skills/multi_agent_delegator)**:
     *   *Fungsi*: `delegate_parallel_subagents`
     *   *Deskripsi*: Mendelegasikan beberapa sub-tugas kompleks sekaligus ke beberapa sub-agent terisolasi secara simultan (`Promise.all`) dengan peran/instruksi terpisah.
+*   **[self_learning](file:///home/naaklaam/Supikip/skills/self_learning)**:
+    *   *Fungsi*: `learn_preference`
+    *   *Deskripsi*: Menyimpan aturan baru, koreksi pengguna, atau preferensi khusus yang diajarkan pengguna secara otomatis ke database SQLite FTS5 tanpa membengkakkan file `CORE_IDENTITY.md`.
 
 ### Cara Menambahkan Skill Baru:
 Buat folder baru di bawah `skills/` (misal: `skills/hello_world/`) yang wajib berisi:
