@@ -21,7 +21,7 @@ const FETCH_TIMEOUT_MS = 800; // Timeout untuk fetch Shinigami (800ms)
 // CONFIG & FUNGSI SCRAPER SHINIGAMI MANHWA
 // ==========================================
 const SHINIGAMI_STATE_FILE = path.join(process.cwd(), 'last_manhwa.json');
-const MANHWA_GROUP_JID = process.env.MANHWA_GROUP_JID || '120363407159758205@g.us';
+const MANHWA_GROUP_JID = process.env.MANHWA_GROUP_JID || '';
 const MANHWA_CHECK_INTERVAL = parseInt(process.env.MANHWA_CHECK_INTERVAL, 10) || 900000; // 15 menit
 const scraperHeaders = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'

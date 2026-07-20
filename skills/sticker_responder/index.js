@@ -5,15 +5,16 @@ import { getRandomStickerByTag } from '../../database_db.js';
 /**
  * Titik masuk eksekusi utama yang dipanggil oleh dynamic loader di tools.js
  */
-export async function execute(args, sock) {
+export async function execute(args, sock, extraContext = {}) {
     const tag = args.tag || 'all';
+    const { jid } = extraContext;
     console.log(`[Skill: sticker_responder] Memanggil stiker dengan tag: ${tag}`);
     
-    // Mengirim ke Grup Manhwa & Grup Punini secara paralel
-    const targets = [
-        '120363407159758205@g.us', // Grup Manhwa
-        '120363322107836319@g.us'  // Grup Punini
-    ];
+    // Tentukan grup target secara dinamis dari konteks atau env TARGET_GROUPS
+    let targets = jid ? [jid] : [];
+    if (targets.length === 0 && process.env.TARGET_GROUPS) {
+        targets = process.env.TARGET_GROUPS.split(',').map(s => s.trim()).filter(Boolean);
+    }
 
     try {
         const stickerRow = await getRandomStickerByTag(tag);
@@ -39,7 +40,7 @@ export async function execute(args, sock) {
             }
         }
 
-        return `Sukses mengirimkan stiker "${stickerRow.filename}" (Tag: ${stickerRow.tag}) sebagai respon ke Grup Manhwa & Punini. Total penggunaan saat ini: ${stickerRow.usage_count + 1} kali.`;
+        return `Sukses mengirimkan stiker "${stickerRow.filename}" (Tag: ${stickerRow.tag}) sebagai respon. Total penggunaan saat ini: ${stickerRow.usage_count + 1} kali.`;
     } catch (e) {
         return `Gagal mengeksekusi stiker responder: ${e.message}`;
     }

@@ -645,10 +645,12 @@ function setOneShotReminder(durationSeconds, message, sock) {
   console.log(`[Tool: set_one_shot_reminder] Menyetel pengingat dalam ${durationSeconds} detik`);
   setTimeout(async () => {
     try {
-      // Targetkan pengiriman pengingat ke grup target manhwa atau owner
-      const targetJid = process.env.MANHWA_GROUP_JID || '120363407159758205@g.us';
-      await sock.sendMessage(targetJid, { text: `🔔 *REMINDER* 🔔\n\n${message}` });
-      console.log(`[Reminder Sent]: ${message}`);
+      // Targetkan pengiriman pengingat ke grup/obrolan peminta atau env
+      const targetJid = extraContext.jid || process.env.MANHWA_GROUP_JID || '';
+      if (targetJid) {
+        await sock.sendMessage(targetJid, { text: `🔔 *REMINDER* 🔔\n\n${message}` });
+        console.log(`[Reminder Sent]: ${message}`);
+      }
     } catch (err) {
       console.error('[Reminder Error] Gagal mengirim pesan pengingat:', err.message);
     }
@@ -897,11 +899,8 @@ async function sendWorkspaceFile(filename, caption, sock, extraContext = {}) {
       return `Sukses mengirimkan berkas "${filename}" langsung ke obrolan WhatsApp peminta.`;
     }
 
-    // Targetkan pengiriman ke beberapa grup bawaan jika tanpa konteks JID
-    const targets = [
-      '120363407159758205@g.us', // Grup Mokel MY
-      '120363410714791327@g.us' // Grup Belajar MacOS
-    ];
+    // Targetkan pengiriman ke grup bawaan dari env jika tanpa konteks JID
+    const targets = (process.env.TARGET_GROUPS || '').split(',').map(s => s.trim()).filter(Boolean);
 
     for (const targetJid of targets) {
       try {
