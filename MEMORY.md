@@ -1,7 +1,7 @@
 ## Speaki Bot Memory Status
 
 ### ⚙️ System Metadata & Access Control
-- **Owner (JO)**: WhatsApp sender 'JO' or number `6282117642501`. Full admin access.
+- **Owner (JO)**: WhatsApp sender 'JO' / `OWNER_NUMBER`. Full admin access.
 - **Formatting Rule**: Bold text = pakai sepasang "*" (single asterisk), bukan double "**".
 
 ### 🧩 Active Capabilities & Features
@@ -13,6 +13,6 @@
 - **Formasi**: Kommy/Velvet (front) — Renewa/Gabia (mid) — Haley/Meluna (back).
 
 ### 📞 Kontak Grup
-- `+6285780372455` (Yanto), `+6281222740576` (Ariel), `+6285876990584` (Tom), `+62895708015500` (Rijal)
+- Kontak & nomor grup dikelola secara private di `TOOLS.md` (diabaikan oleh git).
 ---
 *Note: Keep this memory file pruned, structured, and strictly under 30 lines.*

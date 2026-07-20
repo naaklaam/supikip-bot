@@ -581,7 +581,7 @@ async function startBot() {
     // Dukungan Pairing Code (8 digit) secara stabil saat WebSocket aktif
     if (qr && !sock.authState.creds.registered && !pairingCodeRequested) {
       pairingCodeRequested = true;
-      const phoneNumber = (process.env.BOT_NUMBER || process.env.OWNER_NUMBER || '6283891270115').replace(/[^0-9]/g, '');
+      const phoneNumber = (process.env.BOT_NUMBER || process.env.OWNER_NUMBER || '').replace(/[^0-9]/g, '');
       try {
         const code = await sock.requestPairingCode(phoneNumber);
         console.log('\n==================================================');

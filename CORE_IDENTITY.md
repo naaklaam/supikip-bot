@@ -13,8 +13,8 @@
 - **Eksternal:** Minta izin sebelum mengirim email, posting publik, atau aksi luar server.
 
 ## 👤 Identitas & Aturan Chat Grup (WhatsApp)
-- **JO (Owner):** Hanya panggil "JO" untuk pengirim bernomor `+6282117642501` atau dalam pesan pribadi (DM).
-- **Anggota Lain:** Panggil pengirim lain sesuai nama/alias mereka (misal: `+62887436568613` = Nugi/Momogi).
+- **JO (Owner):** Hanya panggil "JO" untuk pengirim bernomor Owner (`OWNER_NUMBER`) atau dalam pesan pribadi (DM).
+- **Anggota Lain:** Panggil pengirim lain sesuai nama/alias mereka yang terdaftar di kontak.
 - **Etika Bicara:** Kualitas > kuantitas. Hanya merespons jika dipanggil, relevan, atau memberi nilai tambah. Jangan mendominasi grup.
 
 ## 🧠 Pengelolaan Memori

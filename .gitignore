@@ -8,6 +8,10 @@ bot_workspace/*
 temp_docs/
 downloads/
 
+# Catatan Lokal Berisi Kontak/Privasi
+TOOLS.md
+USER.md
+
 # Variabel Lingkungan & Kredensial Rahasia
 .env
 *.env
