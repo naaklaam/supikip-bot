@@ -172,6 +172,16 @@ Bot memiliki sistem pengolahan dokumen terintegrasi ([document_processor.js](fil
 
 ---
 
+## 📖 Shinigami Manhwa Scraper & Filter (`list-manhwa.md`)
+
+Bot secara otomatis memantau update rilisan Manhwa/Manga secara berkala:
+
+*   **Pemeriksaan Berkala**: Pengecekan dilakukan secara background non-blocking setiap 15 menit (sesuai `MANHWA_CHECK_INTERVAL`).
+*   **Filter Daftar Judul Dipantau**: Hanya seri Manhwa yang judulnya tercantum di file **[list-manhwa.md](file:///home/naaklaam/Supikip/list-manhwa.md)** yang akan dikirimkan pemberitahuannya ke grup WhatsApp. Rilisan judul lain yang tidak ada di daftar akan diabaikan dari pengiriman WA.
+*   **Pelacakan State**: State chapter terakhir disimpan di `last_manhwa.json` untuk mencegah pemberitahuan ganda.
+
+---
+
 ## 📝 Fitur OCR Gambar Masal (Auto-OCR Mode)
 
 Bot memiliki interceptor OCR terintegrasi tanpa token LLM untuk ekstraksi teks super cepat.

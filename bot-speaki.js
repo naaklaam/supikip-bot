@@ -22,12 +22,42 @@ const FETCH_TIMEOUT_MS = 800; // Timeout untuk fetch Shinigami (800ms)
 // CONFIG & FUNGSI SCRAPER SHINIGAMI MANHWA
 // ==========================================
 const SHINIGAMI_STATE_FILE = path.join(process.cwd(), 'last_manhwa.json');
+const MANHWA_LIST_FILE = path.join(process.cwd(), 'list-manhwa.md');
 const MANHWA_GROUP_JID = process.env.MANHWA_GROUP_JID || '';
 const MANHWA_CHECK_INTERVAL = parseInt(process.env.MANHWA_CHECK_INTERVAL, 10) || 900000; // 15 menit
 const scraperHeaders = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 };
 let scraperInterval = null;
+
+/**
+ * Membaca daftar judul Manhwa yang dipantau dari list-manhwa.md
+ */
+function getTrackedManhwaTitles() {
+  if (!fs.existsSync(MANHWA_LIST_FILE)) return [];
+  try {
+    const content = fs.readFileSync(MANHWA_LIST_FILE, 'utf-8');
+    return content
+      .split('\n')
+      .map(line => line.replace(/^[\s\-\*\d\.\#]+/, '').trim())
+      .filter(line => line.length > 0);
+  } catch (err) {
+    console.error('[Shinigami Scraper] Gagal membaca list-manhwa.md:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Memeriksa apakah judul Manhwa cocok dengan salah satu judul di list-manhwa.md
+ */
+function isTrackedManhwa(itemTitle, trackedTitles) {
+  if (!trackedTitles || trackedTitles.length === 0) return true; // Izinkan semua jika file tidak ada
+  const lowerItem = itemTitle.toLowerCase();
+  return trackedTitles.some(t => {
+    const lowerT = t.toLowerCase();
+    return lowerItem.includes(lowerT) || lowerT.includes(lowerItem);
+  });
+}
 
 /**
  * Fungsi untuk melacak domain aktif shinigami dan URL API sveltekit-nya secara dinamis.
@@ -200,14 +230,26 @@ async function checkShinigamiUpdates(sock) {
       return;
     }
 
-    // Kirim update ke grup WhatsApp
+    // Kirim update ke grup WhatsApp (HANYA jika judul ada di list-manhwa.md)
     if (updates.length > 0) {
-      console.log(`[Shinigami Scraper] Menemukan ${updates.length} update baru. Mengirim ke grup ${MANHWA_GROUP_JID}...`);
+      const trackedTitles = getTrackedManhwaTitles();
+      console.log(`[Shinigami Scraper] Menemukan ${updates.length} update baru. Memfilter berdasarkan list-manhwa.md (${trackedTitles.length} judul dipantau)...`);
+
       for (const item of updates) {
         const title = item.title;
         const mangaId = item.manga_id;
         const chapterId = item.latest_chapter_id;
         const chapterNum = item.latest_chapter_number;
+
+        if (!isTrackedManhwa(title, trackedTitles)) {
+          console.log(`[Shinigami Scraper] Melewati "${title}" (tidak ada di list-manhwa.md)`);
+          continue;
+        }
+
+        if (!MANHWA_GROUP_JID) {
+          console.log(`[Shinigami Scraper] MANHWA_GROUP_JID belum diatur di .env, melempar pesan WA.`);
+          continue;
+        }
 
         const msg =
           `📖 *${title}*\n` +
@@ -216,7 +258,7 @@ async function checkShinigamiUpdates(sock) {
           `⚡ *Link Baca:* ${webUrl}/chapter/${chapterId}`;
 
         await sock.sendMessage(MANHWA_GROUP_JID, { text: msg });
-        console.log(`[Shinigami Scraper] Update terkirim: ${title} Chapter ${chapterNum}`);
+        console.log(`[Shinigami Scraper] Update terkirim ke WA: ${title} Chapter ${chapterNum}`);
       }
     } else {
       console.log("[Shinigami Scraper] Tidak ada update manhwa baru.");

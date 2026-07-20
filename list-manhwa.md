@@ -1,0 +1,20 @@
+- Reincarnation Of Suicidal Battle God
+- Damn Reincarnation
+- SSS-Class Suicide Hunter
+- Legend Of Heavenly Chaos Demon
+- Omniscient Reader’s Viewpoint
+- Leveling With God
+- Academy’s Undercover Professor
+- I Married The Dragon I Killed
+- Infinite Mage
+- The Heavenly Demon Can’t Live A Normal Life
+- Pick Me Up
+- Nano Machine
+- The World After The Fall
+- Second Life Ranker
+- Solo Max-Level Newbie
+- The Return Of the Crazy Demon
+- The Villain Of Destiny
+- The Regressed Mercenary’s Machinations
+- Star-Embracing Swordmaste
+- The Indomitable Martial King
