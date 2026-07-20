@@ -520,6 +520,7 @@ async function getOpenRouterResponse(jid, sock, msg) {
   } else {
     chatData.lastAccessed = now;
   }
+  const history = chatData.messages;
 
   // Dapatkan memori FTS5 yang relevan dengan pesan pengguna dari SQLite
   const lastUserMsg = history.slice().reverse().find(m => m.role === 'user')?.content || '';
@@ -980,8 +981,8 @@ async function startBot() {
           const isReplyToBot = cleanReplyParticipant === cleanBotJid || (cleanReplyParticipant && cleanReplyParticipant.startsWith('133526976512185'));
           const hasTextMention = text.includes(`@${botNumber}`) || text.includes(`@${botJid.split('@')[0]}`) || text.includes('@133526976512185');
 
-          // Deteksi nama panggilan biasa (speaki / supikip) di dalam teks (case-insensitive)
-          const hasNameMention = lowercaseText.includes('speaki') || lowercaseText.includes('supikip');
+          // Deteksi nama panggilan biasa (speaki / supikip / spikip / spiki) di dalam teks (case-insensitive)
+          const hasNameMention = lowercaseText.includes('speaki') || lowercaseText.includes('supikip') || lowercaseText.includes('spikip') || lowercaseText.includes('spiki');
 
           const isMentioned = mentionedJids.includes(cleanBotJid) ||
             mentionedJids.some(j => j.split('@')[0] === botNumber || j.startsWith('133526976512185')) ||
