@@ -440,7 +440,7 @@ function truncateOutput(text, maxLength = 3000) {
  * Fungsi untuk mengirim permintaan chat completion ke API OpenRouter.
  * @param {string} jid - WhatsApp ID pengguna untuk membedakan riwayat obrolan.
  */
-async function getOpenRouterResponse(jid, sock) {
+async function getOpenRouterResponse(jid, sock, msg) {
   if (!OPENROUTER_API_KEY) {
     return 'Waduh! Kunci API OpenRouter belum diatur di file .env nya!';
   }
@@ -512,7 +512,7 @@ async function getOpenRouterResponse(jid, sock) {
             console.error(`Gagal parsing argumen untuk tool ${name}:`, e.message);
           }
 
-          let toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates);
+          let toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates, { jid, msg });
           toolOutput = truncateOutput(toolOutput, 3000); // Potong output raksasa agar token input tetap hemat
 
           currentMessages.push({
@@ -668,11 +668,15 @@ async function startBot() {
     // Hanya memproses pesan masuk dari orang lain (bukan dari bot itu sendiri)
     if (!msg.key.fromMe && m.type === 'notify') {
       const jid = msg.key.remoteJid;
-      // Mengambil teks dari berbagai jenis tipe pesan WhatsApp (statis, media caption, extended text)
+      const documentMessage = msg.message?.documentMessage ||
+        msg.message?.documentWithCaptionMessage?.message?.documentMessage;
+
+      // Mengambil teks dari berbagai jenis tipe pesan WhatsApp (statis, media caption, extended text, dokumen)
       const text = msg.message?.conversation ||
         msg.message?.extendedTextMessage?.text ||
         msg.message?.imageMessage?.caption ||
         msg.message?.videoMessage?.caption ||
+        documentMessage?.caption ||
         '';
 
       const sticker = msg.message?.stickerMessage;
@@ -825,9 +829,47 @@ async function startBot() {
         }
       }
 
-      if (text) {
-        // Format isi pesan agar LLM tahu siapa yang berbicara (penting untuk obrolan grup)
-        const formattedMessage = `[${senderName}]: ${text}`;
+      let documentInfo = null;
+      if (documentMessage) {
+        console.log(`[Document System] Terdeteksi dokumen masuk: ${documentMessage.fileName || 'file'}`);
+        try {
+          const docBuffer = await downloadMediaMessage(
+            msg,
+            'buffer',
+            {},
+            { logger: pino({ level: 'silent' }) }
+          );
+
+          if (docBuffer) {
+            const { processIncomingDocument } = await import('./document_processor.js');
+            documentInfo = await processIncomingDocument(
+              docBuffer,
+              documentMessage.fileName,
+              documentMessage.mimetype
+            );
+            console.log(`[Document System] Berkas ${documentInfo.fileName} (${documentInfo.fileType}) berhasil diproses.`);
+          }
+        } catch (docErr) {
+          console.error(`[Document System] Gagal mengunduh/memproses dokumen:`, docErr.message);
+        }
+      }
+
+      let promptText = text;
+      if (!promptText && documentInfo) {
+        promptText = `Tolong baca/olah/koreksi/ringkas dokumen ${documentInfo.fileName}`;
+      }
+
+      if (promptText || documentInfo) {
+        // Format isi pesan agar LLM tahu siapa yang berbicara dan apa isi dokumen yang dikirim
+        let formattedMessage = `[${senderName}]: ${promptText}`;
+        if (documentInfo) {
+          formattedMessage += `\n\n[LAMPIRAN DOKUMEN: ${documentInfo.fileName}]\n` +
+            `📁 Tipe: ${documentInfo.fileType}\n` +
+            `💾 Lokasi Server: ${documentInfo.filePath}\n` +
+            `--- ISI DOKUMEN ---\n` +
+            `${documentInfo.parsedContent}\n` +
+            `--- AKHIR ISI DOKUMEN ---`;
+        }
 
         // Simpan pesan ke riwayat obrolan JID ini terlebih dahulu untuk mempertahankan konteks
         if (!chatHistories.has(jid)) {
@@ -884,10 +926,10 @@ async function startBot() {
           await sock.sendPresenceUpdate('composing', jid);
 
           // Dapatkan balasan dari OpenRouter dengan dukungan pemanggilan tools
-          const replyText = await getOpenRouterResponse(jid, sock);
+          const replyText = await getOpenRouterResponse(jid, sock, msg);
 
-          // Kirim balasan ke pengguna
-          await sock.sendMessage(jid, { text: replyText });
+          // Kirim balasan ke pengguna (diquote ke pesan pengirim)
+          await sock.sendMessage(jid, { text: replyText }, { quoted: msg });
 
           // Hentikan indikator sedang mengetik
           await sock.sendPresenceUpdate('paused', jid);

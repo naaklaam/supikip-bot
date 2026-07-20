@@ -838,20 +838,33 @@ async function runPerformanceTest() {
 /**
  * Implementasi Tool 16: Mengirim berkas dokumen/file ke obrolan WhatsApp
  */
-async function sendWorkspaceFile(filename, caption, sock) {
+async function sendWorkspaceFile(filename, caption, sock, extraContext = {}) {
   const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
   console.log(`[Tool: send_workspace_file] Mengirim file: ${safePath}`);
   try {
     if (!fs.existsSync(safePath)) return `Berkas tidak ditemukan: ${filename}`;
 
-    // Targetkan pengiriman ke beberapa grup
+    const { jid, msg } = extraContext;
+    const fileData = fs.readFileSync(safePath);
+    const fileName = path.basename(safePath);
+    const sendOptions = msg ? { quoted: msg } : {};
+
+    // Jika dipanggil dari konteks obrolan spesifik, kirim langsung ke JID tersebut
+    if (jid) {
+      await sock.sendMessage(jid, {
+        document: fileData,
+        mimetype: 'application/octet-stream',
+        fileName: fileName,
+        caption: caption || `Berkas terlampir: ${fileName}`
+      }, sendOptions);
+      return `Sukses mengirimkan berkas "${filename}" langsung ke obrolan WhatsApp peminta.`;
+    }
+
+    // Targetkan pengiriman ke beberapa grup bawaan jika tanpa konteks JID
     const targets = [
       '120363407159758205@g.us', // Grup Mokel MY
       '120363410714791327@g.us' // Grup Belajar MacOS
     ];
-
-    const fileData = fs.readFileSync(safePath);
-    const fileName = path.basename(safePath);
 
     for (const targetJid of targets) {
       try {
@@ -879,7 +892,7 @@ async function sendWorkspaceFile(filename, caption, sock) {
  * @param {object} sock - Koneksi WA sock.
  * @param {function} checkShinigamiUpdatesFn - Referensi fungsi scraper dari bot-speaki.js.
  */
-export async function executeTool(name, args, sock, checkShinigamiUpdatesFn) {
+export async function executeTool(name, args, sock, checkShinigamiUpdatesFn, extraContext) {
   switch (name) {
     case 'web_search':
       return await webSearch(args.query);
@@ -912,7 +925,7 @@ export async function executeTool(name, args, sock, checkShinigamiUpdatesFn) {
     case 'run_performance_test':
       return await runPerformanceTest();
     case 'send_workspace_file':
-      return await sendWorkspaceFile(args.filename, args.caption, sock);
+      return await sendWorkspaceFile(args.filename, args.caption, sock, extraContext);
     default:
       // Coba memuat dan mengeksekusi skill dinamis dari folder skills/ jika tersedia
       if (loadedSkills.has(name)) {
@@ -920,7 +933,7 @@ export async function executeTool(name, args, sock, checkShinigamiUpdatesFn) {
           const execJsPath = loadedSkills.get(name);
           const skillModule = await import(execJsPath);
           if (typeof skillModule.execute === 'function') {
-            return await skillModule.execute(args, sock);
+            return await skillModule.execute(args, sock, extraContext);
           } else {
             return `Gagal mengeksekusi skill "${name}": Fungsi ekspor "execute" tidak ditemukan di index.js.`;
           }

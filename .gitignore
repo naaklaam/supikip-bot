@@ -6,6 +6,9 @@ package-lock.json
 .env
 *.env
 speaki.db
+cookies.txt
+*.cookies
+temp_docs/
 
 # Sesi & Cache WhatsApp Baileys (Berisi Token Autentikasi Rahasia)
 sesi_speaki/

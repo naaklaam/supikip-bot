@@ -88,6 +88,9 @@ Bot secara otomatis memindai direktori [skills/](file:///home/naaklaam/Supikip/s
 *   **[sticker_responder](file:///home/naaklaam/Supikip/skills/sticker_responder)**:
     *   *Fungsi*: `send_sticker_response`
     *   *Deskripsi*: Mengirimkan stiker WhatsApp biner mentah secara acak berdasarkan tag kategori (ekspresi) dari database SQLite lokal.
+*   **[social_media_downloader](file:///home/naaklaam/Supikip/skills/social_media_downloader)**:
+    *   *Fungsi*: `download_social_media`
+    *   *Deskripsi*: Mengunduh media/video/audio dari YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit, Pinterest, dll. menggunakan `yt-dlp`. Berkas disimpan di `~/Downloads/SocialMedia/[Platform]` dan otomatis dikirimkan kembali ke obrolan WhatsApp peminta sebagai balasan kutipan (*quoted reply*). Otomatis menyuntikkan `cookies.txt` dari `~/Downloads/cookies.txt` untuk media yang membutuhkan autentikasi login (misal Instagram Reels).
 
 ### Cara Menambahkan Skill Baru:
 Buat folder baru di bawah `skills/` (misal: `skills/hello_world/`) yang wajib berisi:
@@ -134,7 +137,26 @@ Bot dilengkapi dengan database relasional lokal serverless **SQLite3** (`speaki.
 
 ---
 
-## 📝 Fitur OCR Gambar Gambar Masal (Auto-OCR Mode)
+## 📄 Fitur Pengolah Dokumen WhatsApp (`document_processor.js`)
+
+Bot memiliki sistem pengolahan dokumen terintegrasi ([document_processor.js](file:///home/naaklaam/Supikip/document_processor.js)) yang mampu mengunduh, membaca, dan menganalisis berkas dokumen yang dikirimkan pengguna ke obrolan WhatsApp:
+
+*   **Format Berkas yang Didukung**:
+    *   **Teks & Kode**: `.txt`, `.md`, `.json`, `.csv`, `.log`, `.yaml`, `.yml`, `.xml`, `.js`, `.ts`, `.py`, `.html`, `.css`, `.sql`, dll.
+    *   **Spreadsheet / Excel**: `.xlsx`, `.xls`, `.ods` (diekstrak otomatis per-sheet menjadi CSV/tabel terstruktur via `xlsx`).
+    *   **Word Document**: `.docx` (diekstrak otomatis menjadi teks via `mammoth`).
+    *   **PDF Document**: `.pdf` (diekstrak teksnya via `pdf-parse`).
+*   **Alur Pemrosesan**:
+    *   File disimpan otomatis ke folder `./temp_docs/`.
+    *   Konten teks dokumen disuntikkan ke dalam konteks LLM sehingga bot dapat merangkum, mengecek kesalahan (proofread), mengoreksi, atau menjawab pertanyaan spesifik mengenai dokumen tersebut.
+*   **Auto-Sync Cookies**:
+    *   Mengunggah berkas bernama `cookies.txt` di WhatsApp secara otomatis memperbarui `~/Downloads/cookies.txt` dan `./cookies.txt` di server untuk kebutuhan `yt-dlp`.
+*   **Pengiriman Kembali Berkas Terkoreksi**:
+    *   Jika pengguna meminta pembuatan/perbaikan dokumen, LLM menggunakan tool `send_workspace_file` untuk mengirim berkas kembali ke obrolan sebagai balasan kutipan (*quoted document reply*).
+
+---
+
+## 📝 Fitur OCR Gambar Masal (Auto-OCR Mode)
 
 Bot memiliki interceptor OCR terintegrasi tanpa token LLM untuk ekstraksi teks super cepat.
 
