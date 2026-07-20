@@ -376,34 +376,71 @@ const staticSchema = [
 export const toolsSchema = [...staticSchema, ...loadDynamicSkills()];
 
 /**
- * Implementasi Tool 1: Pencarian Web menggunakan DuckDuckGo HTML Scraper (Tanpa API Key tambahan)
+ * Implementasi Tool 1: Pencarian Web menggunakan Tavily API (Primary) dengan Fallback ke SerpAPI & DuckDuckGo Scraper
  */
 async function webSearch(query) {
-  console.log(`[Tool: web_search] Mencari via Serp API: ${query}`);
-  const apiKey = process.env.SERPAPI_API_KEY;
-  if (!apiKey) {
-    console.log(`[Tool: web_search] SERPAPI_API_KEY tidak ditemukan, fallback ke DuckDuckGo scraper.`);
-    return await webSearchFallback(query);
-  }
-  try {
-    const url = `https://serpapi.com/search.json?q=${encodeURIComponent(query)}&api_key=${apiKey}`;
-    const response = await fetch(url);
-    if (!response.ok) return `Gagal melakukan pencarian via Serp API: HTTP ${response.status}`;
-    incrementSerpApiUsage();
-    const data = await response.json();
+  // 1. Coba Tavily API terlebih dahulu (Primary)
+  const tavilyKey = process.env.TAVILY_API_KEY;
+  if (tavilyKey) {
+    try {
+      console.log(`[Tool: web_search] Mencari via Tavily API: ${query}`);
+      const res = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query: query,
+          search_depth: 'basic',
+          include_answer: true,
+          max_results: 5
+        })
+      });
 
-    if (!data.organic_results || data.organic_results.length === 0) {
-      return `Pencarian internet untuk "${query}" tidak memberikan hasil.`;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          let output = `Berikut adalah hasil pencarian internet (via Tavily) untuk "${query}":\n\n`;
+          if (data.answer) {
+            output += `💡 *Ringkasan Jawaban:* ${data.answer}\n\n`;
+          }
+          const items = data.results.map((item, i) => {
+            return `[Hasil ${i + 1}]: ${item.title}\nLink: ${item.url}\nSnippet: ${item.content || 'Tidak ada deskripsi.'}`;
+          }).join('\n\n');
+          return output + items;
+        }
+      } else {
+        console.warn(`[Tool: web_search] Tavily API HTTP ${res.status}, mencoba fallback ke SerpAPI...`);
+      }
+    } catch (err) {
+      console.error(`[Tool: web_search] Tavily API error: ${err.message}, mencoba fallback ke SerpAPI...`);
     }
-
-    const results = data.organic_results.slice(0, 5).map((item, i) => {
-      return `[Hasil ${i + 1}]: ${item.title}\nLink: ${item.link}\nSnippet: ${item.snippet || 'Tidak ada deskripsi.'}`;
-    }).join('\n\n');
-
-    return `Berikut adalah hasil pencarian internet teratas untuk "${query}":\n\n${results}`;
-  } catch (error) {
-    return `Error saat melakukan pencarian via Serp API: ${error.message}`;
   }
+
+  // 2. Fallback Pertama: SerpAPI
+  const serpKey = process.env.SERPAPI_API_KEY;
+  if (serpKey) {
+    try {
+      console.log(`[Tool: web_search] Fallback: Mencari via SerpAPI: ${query}`);
+      const url = `https://serpapi.com/search.json?q=${encodeURIComponent(query)}&api_key=${serpKey}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        incrementSerpApiUsage();
+        const data = await response.json();
+        if (data.organic_results && data.organic_results.length > 0) {
+          const results = data.organic_results.slice(0, 5).map((item, i) => {
+            return `[Hasil ${i + 1}]: ${item.title}\nLink: ${item.link}\nSnippet: ${item.snippet || 'Tidak ada deskripsi.'}`;
+          }).join('\n\n');
+          return `Berikut adalah hasil pencarian internet (via SerpAPI) untuk "${query}":\n\n${results}`;
+        }
+      }
+    } catch (error) {
+      console.error(`[Tool: web_search] SerpAPI error: ${error.message}`);
+    }
+  }
+
+  // 3. Fallback Kedua: DuckDuckGo Scraper
+  console.log(`[Tool: web_search] Fallback: Mencari via DuckDuckGo Scraper: ${query}`);
+  return await webSearchFallback(query);
 }
 
 async function webSearchFallback(query) {

@@ -56,7 +56,7 @@ Pindai (scan) QR Code yang ada di terminal menggunakan fitur **Perangkat Tertaut
 
 Bot dilengkapi dengan tools statis bawaan di **[tools.js](file:///home/naaklaam/Supikip/tools.js)** yang bisa dipanggil oleh LLM secara dinamis:
 
-1. **`web_search`**: Pencarian web menggunakan DuckDuckGo HTML Scraper.
+1. **`web_search`**: Pencarian web pintar bertingkat (Tavily Search API sebagai pencarian utama + ringkasan AI, SerpAPI sebagai cadangan pertama, dan DuckDuckGo Scraper sebagai cadangan kedua).
 2. **`web_fetch`**: Mengambil & membersihkan konten teks dari halaman URL web tertentu.
 3. **`get_system_status`**: Metrik status performa PC/Server (RAM, CPU, Uptime).
 4. **`read_workspace_file` & `write_workspace_file`**: Operasi file I/O lokal di workspace.
