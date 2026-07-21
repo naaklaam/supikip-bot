@@ -45,3 +45,7 @@ sticker_*.webp
 tmp/
 *.tmp
 *.temp
+
+# Laporan & Jurnal Sensitif (Lokal Saja)
+Celah Bot.md
+memory/

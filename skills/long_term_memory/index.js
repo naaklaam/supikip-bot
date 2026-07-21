@@ -1,4 +1,4 @@
-import { searchChatMessageHistory, searchLongTermFact, saveLongTermFact } from '../../database_db.js';
+import { searchChatMessageHistory, searchLongTermFact, saveLongTermFact } from '../../src/db/index.js';
 
 /**
  * Titik masuk eksekusi utama yang dipanggil oleh dynamic loader di tools.js

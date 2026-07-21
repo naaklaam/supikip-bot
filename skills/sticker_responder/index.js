@@ -1,6 +1,6 @@
 import path from 'path';
 import fs from 'fs';
-import { getRandomStickerByTag } from '../../database_db.js';
+import { getRandomStickerByTag } from '../../src/db/index.js';
 
 /**
  * Titik masuk eksekusi utama yang dipanggil oleh dynamic loader di tools.js
