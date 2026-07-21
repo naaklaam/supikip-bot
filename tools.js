@@ -4,6 +4,9 @@ import path from 'path';
 import { exec } from 'child_process';
 import dotenv from 'dotenv';
 import { createRequire } from 'module';
+import { atomicWriteJsonSync, atomicWriteFileSync } from './src/utils/atomic_file.js';
+import { reloadCronSchedules } from './src/services/cron_scheduler.js';
+
 const require = createRequire(import.meta.url);
 const pdf = require('pdf-parse');
 
@@ -23,7 +26,7 @@ function incrementSerpApiUsage() {
     }
     quota.usage_count = (quota.usage_count || 0) + 1;
     quota.last_updated = new Date().toISOString();
-    fs.writeFileSync(SERPAPI_QUOTA_FILE, JSON.stringify(quota, null, 2), 'utf-8');
+    atomicWriteJsonSync(SERPAPI_QUOTA_FILE, quota);
   } catch (error) {
     console.error(`[SerpAPI Quota] Gagal memperbarui quota: ${error.message}`);
   }
@@ -31,6 +34,153 @@ function incrementSerpApiUsage() {
 
 // Peta penyimpanan modul skill yang dimuat secara dinamis
 const loadedSkills = new Map();
+
+// Tool sistem yang hanya boleh dieksekusi oleh Owner (JO).
+const OWNER_ONLY_TOOL_NAMES = new Set([
+  'run_terminal_command',
+  'write_workspace_file',
+  'apply_patch',
+  'add_cron_schedule',
+  'remove_cron_schedule'
+]);
+
+/**
+ * Mengambil nomor pengirim dari pesan WhatsApp.
+ * Untuk grup, WhatsApp biasanya menyimpan sender JID di msg.key.participant.
+ * Untuk DM, msg.key.remoteJid adalah sender JID.
+ */
+function getSenderJidFromMessage(msg) {
+  return msg?.key?.participant || msg?.key?.remoteJid || '';
+}
+
+/**
+ * Mengambil nomor normalized dari JID WhatsApp.
+ */
+function normalizeJidNumber(jid) {
+  return String(jid || '').split('@')[0].replace(/\D/g, '');
+}
+
+/**
+ * Mengecek apakah konteks pesan berasal dari Owner (JO).
+ * Owner diakui melalui OWNER_NUMBER di .env atau nama pengirim "JO".
+ */
+function isOwnerContext(extraContext = {}) {
+  const msg = extraContext.msg;
+  const senderJid = getSenderJidFromMessage(msg) || extraContext.jid || '';
+  const senderNumber = normalizeJidNumber(senderJid);
+  const senderName = msg?.pushName || '';
+  const ownerNumber = normalizeJidNumber(process.env.OWNER_NUMBER);
+
+  if (senderName === 'JO') return true;
+  if (ownerNumber && senderNumber === ownerNumber) return true;
+
+  return false;
+}
+
+/**
+ * Middleware untuk membatasi tool sistem tertentu hanya untuk Owner (JO).
+ */
+function enforceOwnerOnlyTool(name, extraContext = {}) {
+  if (!OWNER_ONLY_TOOL_NAMES.has(name)) return true;
+
+  if (isOwnerContext(extraContext)) return true;
+
+  return `Akses ditolak. Tool "${name}" hanya dapat digunakan oleh Owner (JO).`;
+}
+
+/**
+ * Memvalidasi struktur skema tool yang dimuat dari SKILL.md
+ * @param {object} schema - JSON skema tool
+ * @param {Set<string>} existingNames - Set nama tool yang sudah terdaftar
+ * @returns {{ valid: boolean, error?: string, normalizedSchema?: object }}
+ */
+function validateSkillSchema(schema, existingNames = new Set()) {
+  if (!schema || typeof schema !== 'object') {
+    return { valid: false, error: 'Skema harus berupa objek JSON' };
+  }
+
+  const toolType = schema.type || 'function';
+  if (toolType !== 'function') {
+    return { valid: false, error: `Tipe tool '${toolType}' tidak didukung (harus 'function')` };
+  }
+
+  const func = schema.function;
+  if (!func || typeof func !== 'object' || Array.isArray(func)) {
+    return { valid: false, error: 'Objek `function` tidak ditemukan dalam skema' };
+  }
+
+  const name = func.name;
+  if (!name || typeof name !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(name.trim())) {
+    return { valid: false, error: `Nama fungsi '${name || ''}' tidak valid. Harus berupa string alfanumerik (1-64 karakter)` };
+  }
+
+  const cleanName = name.trim();
+  if (existingNames.has(cleanName)) {
+    return { valid: false, error: `Nama tool '${cleanName}' sudah terdaftar (terjadi konflik nama)` };
+  }
+
+  const description = func.description;
+  if (!description || typeof description !== 'string' || !description.trim()) {
+    return { valid: false, error: `Deskripsi fungsi '${cleanName}' tidak boleh kosong` };
+  }
+
+  const parameters = func.parameters || { type: 'object', properties: {} };
+  if (!parameters || typeof parameters !== 'object' || Array.isArray(parameters)) {
+    return { valid: false, error: `Parameter fungsi '${cleanName}' harus berupa objek` };
+  }
+
+  if (parameters.type !== 'object') {
+    return { valid: false, error: `Parameter fungsi '${cleanName}' harus memiliki type 'object'` };
+  }
+
+  const properties = parameters.properties || {};
+  if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
+    return { valid: false, error: `Parameter fungsi '${cleanName}' harus memiliki properties berupa objek` };
+  }
+
+  const seenProperties = new Set();
+  for (const [paramName, propertySchema] of Object.entries(properties)) {
+    if (!paramName || typeof paramName !== 'string') {
+      return { valid: false, error: `Parameter fungsi '${cleanName}' memiliki nama parameter tidak valid` };
+    }
+    if (seenProperties.has(paramName)) {
+      return { valid: false, error: `Parameter fungsi '${cleanName}' memiliki duplikat parameter '${paramName}'` };
+    }
+    seenProperties.add(paramName);
+
+    if (!propertySchema || typeof propertySchema !== 'object' || Array.isArray(propertySchema)) {
+      return { valid: false, error: `Parameter '${paramName}' pada tool '${cleanName}' harus berupa objek schema` };
+    }
+
+    if (!propertySchema.type || typeof propertySchema.type !== 'string') {
+      return { valid: false, error: `Parameter '${paramName}' pada tool '${cleanName}' harus memiliki type` };
+    }
+
+    if (!propertySchema.description || typeof propertySchema.description !== 'string' || !propertySchema.description.trim()) {
+      return { valid: false, error: `Parameter '${paramName}' pada tool '${cleanName}' harus memiliki deskripsi` };
+    }
+  }
+
+  const required = parameters.required || [];
+  if (required.length > 0 && (!Array.isArray(required) || required.some(item => typeof item !== 'string' || !properties[item]))) {
+    return { valid: false, error: `Parameter fungsi '${cleanName}' memiliki required yang tidak valid` };
+  }
+
+  const normalizedSchema = {
+    type: 'function',
+    function: {
+      name: cleanName,
+      description: description.trim(),
+      parameters: {
+        type: 'object',
+        properties,
+        ...(parameters.required && Array.isArray(parameters.required) ? { required: parameters.required } : {})
+      }
+    }
+  };
+
+  return { valid: true, normalizedSchema };
+}
 
 /**
  * Memindai direktori 'skills/' dan memuat skema serta fungsi eksekusi secara dinamis.
@@ -40,6 +190,9 @@ function loadDynamicSkills() {
   const dynamicSchemas = [];
 
   if (!fs.existsSync(skillsDir)) return dynamicSchemas;
+
+  // Catat nama-nama static tool yang sudah ada untuk menghindari duplikasi
+  const registeredNames = new Set(staticSchema.map(s => s.function?.name).filter(Boolean));
 
   try {
     const items = fs.readdirSync(skillsDir);
@@ -54,15 +207,23 @@ function loadDynamicSkills() {
             const mdContent = fs.readFileSync(skillMdPath, 'utf-8');
 
             // Ekstrak blok JSON skema dari SKILL.md
-            // Mencari tag ```json ... ``` yang mendefinisikan tool schema
             const jsonMatch = mdContent.match(/```json\s*([\s\S]*?)\s*```/);
             if (jsonMatch) {
-              const schema = JSON.parse(jsonMatch[1]);
-              dynamicSchemas.push(schema);
+              const rawSchema = JSON.parse(jsonMatch[1]);
+              const validation = validateSkillSchema(rawSchema, registeredNames);
+              if (validation.valid && validation.normalizedSchema) {
+                const schema = validation.normalizedSchema;
+                dynamicSchemas.push(schema);
+                registeredNames.add(schema.function.name);
 
-              // Daftarkan jalur berkas index.js untuk diimpor saat eksekusi
-              loadedSkills.set(schema.function.name, execJsPath);
-              console.log(`[Skills Loader] Sukses memuat skill dinamis: ${schema.function.name}`);
+                // Daftarkan jalur berkas index.js untuk diimpor saat eksekusi
+                loadedSkills.set(schema.function.name, execJsPath);
+                console.log(`[Skills Loader] Sukses memuat & memvalidasi skill dinamis: ${schema.function.name}`);
+              } else {
+                console.warn(`[Skills Loader] Melewati skill di folder '${item}': ${validation.error}`);
+              }
+            } else {
+              console.warn(`[Skills Loader] Blok skema JSON tidak ditemukan di SKILL.md untuk folder '${item}'`);
             }
           } catch (err) {
             console.error(`[Skills Loader] Gagal parsing SKILL.md untuk folder ${item}:`, err.message);
@@ -575,7 +736,7 @@ function writeWorkspaceFile(filename, content) {
   const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
   console.log(`[Tool: write_workspace_file] Menulis ke: ${safePath}`);
   try {
-    fs.writeFileSync(safePath, content, 'utf-8');
+    atomicWriteFileSync(safePath, content);
     return `Berhasil menulis konten ke berkas "${filename}".`;
   } catch (e) {
     return `Gagal menulis berkas: ${e.message}`;
@@ -601,7 +762,7 @@ function runTerminalCommand(command) {
 /**
  * Implementasi Tool 8: Menambahkan cron schedule dinamis
  */
-function addCronSchedule(schedule, description, prompt) {
+function addCronSchedule(schedule, description, prompt, sock) {
   console.log(`[Tool: add_cron_schedule] Menambahkan schedule: ${schedule}`);
   const filePath = path.join(process.cwd(), 'schedules.json');
   try {
@@ -610,8 +771,9 @@ function addCronSchedule(schedule, description, prompt) {
       schedules = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     }
     schedules.push({ schedule, description, prompt });
-    fs.writeFileSync(filePath, JSON.stringify(schedules, null, 2), 'utf-8');
-    return `Sukses mendaftarkan cron job baru: "${description}". Bot perlu di-restart atau direkoneksi agar cron job aktif secara live.`;
+    atomicWriteJsonSync(filePath, schedules);
+    reloadCronSchedules(sock);
+    return `Sukses mendaftarkan cron job baru: "${description}". Perubahan jadwal cron telah aktif secara live.`;
   } catch (e) {
     return `Gagal menambahkan jadwal cron: ${e.message}`;
   }
@@ -620,7 +782,7 @@ function addCronSchedule(schedule, description, prompt) {
 /**
  * Implementasi Tool 9: Menghapus cron schedule dinamis
  */
-function removeCronSchedule(description) {
+function removeCronSchedule(description, sock) {
   console.log(`[Tool: remove_cron_schedule] Menghapus schedule dengan deskripsi: ${description}`);
   const filePath = path.join(process.cwd(), 'schedules.json');
   try {
@@ -631,8 +793,9 @@ function removeCronSchedule(description) {
     if (schedules.length === initialLen) {
       return `Tidak ditemukan jadwal cron dengan deskripsi "${description}".`;
     }
-    fs.writeFileSync(filePath, JSON.stringify(schedules, null, 2), 'utf-8');
-    return `Sukses menghapus cron job: "${description}". Perubahan akan aktif live pada restart/koneksi bot berikutnya.`;
+    atomicWriteJsonSync(filePath, schedules);
+    reloadCronSchedules(sock);
+    return `Sukses menghapus cron job: "${description}". Perubahan jadwal cron telah aktif secara live.`;
   } catch (e) {
     return `Gagal menghapus jadwal cron: ${e.message}`;
   }
@@ -928,7 +1091,13 @@ async function sendWorkspaceFile(filename, caption, sock, extraContext = {}) {
  * @param {object} sock - Koneksi WA sock.
  * @param {function} checkShinigamiUpdatesFn - Referensi fungsi scraper dari bot-speaki.js.
  */
-export async function executeTool(name, args, sock, checkShinigamiUpdatesFn, extraContext) {
+export async function executeTool(name, args, sock, checkShinigamiUpdatesFn, extraContext = {}) {
+  const ownerOnlyResult = enforceOwnerOnlyTool(name, extraContext);
+  if (typeof ownerOnlyResult === 'string') {
+    console.warn(`[Tool Authorization] ${ownerOnlyResult}`);
+    return ownerOnlyResult;
+  }
+
   switch (name) {
     case 'web_search':
       return await webSearch(args.query);
@@ -945,9 +1114,9 @@ export async function executeTool(name, args, sock, checkShinigamiUpdatesFn, ext
     case 'run_terminal_command':
       return await runTerminalCommand(args.command);
     case 'add_cron_schedule':
-      return addCronSchedule(args.schedule, args.description, args.prompt);
+      return addCronSchedule(args.schedule, args.description, args.prompt, sock);
     case 'remove_cron_schedule':
-      return removeCronSchedule(args.description);
+      return removeCronSchedule(args.description, sock);
     case 'set_one_shot_reminder':
       return setOneShotReminder(args.durationSeconds, args.message, sock);
     case 'apply_patch':

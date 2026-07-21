@@ -10,14 +10,16 @@ Panduan ini membantu Anda menyiapkan, mengonfigurasi, dan menjalankan bot WhatsA
 
 ---
 
-## 📂 Struktur Berkas Bot & Prompting Terstruktur
+## 📂 Arsitektur Modular & Berkas Prompting Terstruktur
 
-Semua berkas bot berada di direktori project Speaki:
-1. **[bot-speaki.js](file://./bot-speaki.js)**: Berkas kode utama bot WhatsApp. Mengatur koneksi socket, pemrosesan pesan, interseptor stiker masuk, dan integrasi dengan OpenRouter API.
-2. **[tools.js](file://./tools.js)**: Registry utama tools statis dan loader untuk dynamic skills.
-3. **[package.json](file://./package.json)**: Berkas manifes Node.js untuk dependensi (`@itsliaaa/baileys`, `node-cron`, `pdf-parse`).
-4. **[.env](file://./.env)**: API Key OpenRouter dan konfigurasi model LLM.
-5. **[skills/](file://./skills)**: Folder penyimpanan modul kemampuan (*dynamic skills*) pihak ketiga yang dimuat secara dinamis.
+Semua kode bot telah direstrukturisasi secara modular di bawah direktori `src/`:
+1. **[bot-speaki.js](file://./bot-speaki.js)**: Entrypoint utama aplikasi.
+2. **`src/connection/`**: [start_bot.js](file://./src/connection/start_bot.js) mengelola siklus hidup koneksi WebSocket Baileys, queue pesan masuk, dan auto-reconnect backoff.
+3. **`src/handlers/`**: [message_handler.js](file://./src/handlers/message_handler.js) & [llm.js](file://./src/handlers/llm.js) menangani pemfilteran pesan, panggilan OpenRouter LLM, dan injeksi konteks memori/status.
+4. **`src/services/`**: [cron_scheduler.js](file://./src/services/cron_scheduler.js) (dengan live file watcher), [shinigami_scraper.js](file://./src/services/shinigami_scraper.js) (resolusi domain induk `shinigami.to`), dan [heartbeat.js](file://./src/services/heartbeat.js).
+5. **`src/utils/`**: [atomic_file.js](file://./src/utils/atomic_file.js) menyediakan penulisan file atomik aman (*temporary file + rename*) untuk mencegah korupsi data state.
+6. **[tools.js](file://./tools.js)**: Registry utama tools statis dan loader validator untuk dynamic skills.
+7. **[skills/](file://./skills)**: Folder penyimpanan modul kemampuan (*dynamic skills*) pihak ketiga yang dimuat secara dinamis dengan validasi skema JSON.
 
 ### 🧠 Berkas Prompting Terstruktur (Gaya OpenClaw)
 Kepribadian dan perilaku bot ditentukan secara modular melalui file-file markdown berikut yang digabungkan secara dinamis sebagai System Prompt:
