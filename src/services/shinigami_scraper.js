@@ -359,7 +359,11 @@ export async function checkShinigamiUpdates(sock) {
           continue;
         }
 
-        if (!MANHWA_GROUP_JID) {
+        const targetJids = MANHWA_GROUP_JID
+          ? MANHWA_GROUP_JID.split(',').map(j => j.trim()).filter(Boolean)
+          : [];
+
+        if (targetJids.length === 0) {
           console.log(`[Shinigami Scraper] MANHWA_GROUP_JID belum diatur di .env, melempar pesan WA.`);
           continue;
         }
@@ -378,26 +382,30 @@ export async function checkShinigamiUpdates(sock) {
         if (stickerRow) {
           const stickerPath = path.join(process.cwd(), 'stiker_db', stickerRow.filename);
           if (fs.existsSync(stickerPath)) {
-            try {
-              await sock.sendMessage(MANHWA_GROUP_JID, { sticker: fs.readFileSync(stickerPath) });
-              console.log(`[Shinigami Scraper] Stiker cover terkirim ke WA untuk: ${title}`);
-            } catch (stickerErr) {
-              console.error(`[Shinigami Scraper] Gagal mengirim stiker cover untuk "${title}":`, stickerErr.message);
+            for (const targetJid of targetJids) {
+              try {
+                await sock.sendMessage(targetJid, { sticker: fs.readFileSync(stickerPath) });
+                console.log(`[Shinigami Scraper] Stiker cover terkirim ke WA (${targetJid}) untuk: ${title}`);
+              } catch (stickerErr) {
+                console.error(`[Shinigami Scraper] Gagal mengirim stiker cover ke ${targetJid} untuk "${title}":`, stickerErr.message);
+              }
             }
           }
         }
 
-        try {
-          const msg =
-            `📖 *${title}*\n` +
-            `📌 Chapter: *${chapterNum}*\n\n` +
-            `🔗 *Link Series:* ${webUrl}/series/${mangaId}\n` +
-            `⚡ *Link Baca:* ${webUrl}/chapter/${chapterId}`;
+        const msg =
+          `📖 *${title}*\n` +
+          `📌 Chapter: *${chapterNum}*\n\n` +
+          `🔗 *Link Series:* ${webUrl}/series/${mangaId}\n` +
+          `⚡ *Link Baca:* ${webUrl}/chapter/${chapterId}`;
 
-          await sock.sendMessage(MANHWA_GROUP_JID, { text: msg });
-          console.log(`[Shinigami Scraper] Update terkirim ke WA: ${title} Chapter ${chapterNum}`);
-        } catch (msgErr) {
-          console.error(`[Shinigami Scraper] Gagal mengirim pesan untuk "${title}":`, msgErr.message);
+        for (const targetJid of targetJids) {
+          try {
+            await sock.sendMessage(targetJid, { text: msg });
+            console.log(`[Shinigami Scraper] Update terkirim ke WA (${targetJid}): ${title} Chapter ${chapterNum}`);
+          } catch (msgErr) {
+            console.error(`[Shinigami Scraper] Gagal mengirim pesan ke ${targetJid} untuk "${title}":`, msgErr.message);
+          }
         }
 
         // Update state secara dinamis & atomik setelah sukses terkirim
