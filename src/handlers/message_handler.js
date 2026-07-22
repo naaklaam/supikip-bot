@@ -9,6 +9,7 @@ import { getOpenRouterResponse } from './llm.js';
 import { saveChatMessage } from '../db/index.js';
 import { getDownloadMediaMessage, getJidNormalizedUser } from '../utils/baileys_loader.js';
 import { getSessionJid } from '../utils/session_helper.js';
+import { getCachedGroupNames } from '../utils/group_resolver.js';
 
 // Map untuk melacak status aktifasi Auto-OCR di setiap chat room (JID)
 export const ocrActiveRooms = new Map();
@@ -275,7 +276,9 @@ export async function handleIncomingMessage(sock, msg) {
           isReplyToBot ||
           hasNameMention;
 
-        console.log(`[Pesan Grup dari ${senderName} di ${jid}] (Mentioned: ${isMentioned}): ${text}`);
+        const groupNames = getCachedGroupNames();
+        const groupLabel = groupNames[jid] ? `${groupNames[jid]} (${jid})` : jid;
+        console.log(`[Pesan Grup dari ${senderName} di ${groupLabel}] (Mentioned: ${isMentioned}): ${text}`);
 
         if (isMentioned) {
           shouldReply = true;
