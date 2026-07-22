@@ -1,5 +1,4 @@
 import { Boom } from '@hapi/boom';
-import { Browsers, DisconnectReason, makeWASocket, useMultiFileAuthState } from '@itsliaaa/baileys';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import { initDatabase } from '../db/index.js';
@@ -8,6 +7,7 @@ import { initCronSchedules } from '../services/cron_scheduler.js';
 import { MANHWA_CHECK_INTERVAL, checkShinigamiUpdates } from '../services/shinigami_scraper.js';
 import { handleIncomingMessage } from '../handlers/message_handler.js';
 import { chatHistories } from '../handlers/llm.js';
+import { getBrowsers, getDisconnectReason, getMakeWASocket, getUseMultiFileAuthState } from '../utils/baileys_loader.js';
 
 // Mencegah inisialisasi database berulang saat WhatsApp reconnect.
 let databaseInitialized = false;
@@ -40,6 +40,14 @@ function enqueueMessage(sock, msg) {
  */
 async function startBot() {
   console.log('Memulai koneksi WhatsApp...');
+
+  // Lazy load baileys modules (reduces memory footprint)
+  const [useMultiFileAuthState, makeWASocket, Browsers, DisconnectReason] = await Promise.all([
+    getUseMultiFileAuthState(),
+    getMakeWASocket(),
+    getBrowsers(),
+    getDisconnectReason()
+  ]);
 
   // Menggunakan strategi penyimpanan sesi multi-file di folder 'sesi_speaki'
   const { state, saveCreds } = await useMultiFileAuthState('sesi_speaki');

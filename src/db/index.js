@@ -1,6 +1,7 @@
 import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { stickerCache, searchCache, factCache } from '../utils/lru_cache.js';
 
 const DB_PATH = path.join(process.cwd(), 'speaki.db');
 
@@ -188,12 +189,20 @@ export function saveChatMessage(jid, senderName, senderJid, messageText, isBot =
 
 /**
  * Mencari riwayat pesan lampau menggunakan SQLite FTS5 (Full-Text Search)
+ * Dengan caching untuk mengurangi query berulang
  */
 export function searchChatMessageHistory(query, targetJid = null, limit = 5) {
   return new Promise((resolve) => {
     if (!query || typeof query !== 'string') return resolve([]);
     const cleanQuery = query.replace(/[^\w\s]/gi, ' ').trim();
     if (!cleanQuery) return resolve([]);
+
+    // Check cache first
+    const cacheKey = `search:${cleanQuery}:${targetJid || 'all'}:${limit}`;
+    const cached = searchCache.get(cacheKey);
+    if (cached) {
+      return resolve(cached);
+    }
 
     const db = new sqlite3.Database(DB_PATH);
     let sql = `
@@ -218,6 +227,8 @@ export function searchChatMessageHistory(query, targetJid = null, limit = 5) {
         console.error('[Memory DB Error] searchChatMessageHistory:', err.message);
         return resolve([]);
       }
+      // Cache the result
+      searchCache.set(cacheKey, rows || []);
       resolve(rows || []);
     });
   });
@@ -243,12 +254,20 @@ export function saveLongTermFact(category, keyTopic, valueFact, sourceJid = null
 
 /**
  * Mencari fakta memori jangka panjang menggunakan SQLite FTS5
+ * Dengan caching untuk mengurangi query berulang
  */
 export function searchLongTermFact(query, limit = 5) {
   return new Promise((resolve) => {
     if (!query || typeof query !== 'string') return resolve([]);
     const cleanQuery = query.replace(/[^\w\s]/gi, ' ').trim();
     if (!cleanQuery) return resolve([]);
+
+    // Check cache first
+    const cacheKey = `fact:${cleanQuery}:${limit}`;
+    const cached = factCache.get(cacheKey);
+    if (cached) {
+      return resolve(cached);
+    }
 
     const db = new sqlite3.Database(DB_PATH);
     const sql = `
@@ -265,6 +284,8 @@ export function searchLongTermFact(query, limit = 5) {
         console.error('[Memory DB Error] searchLongTermFact:', err.message);
         return resolve([]);
       }
+      // Cache the result
+      factCache.set(cacheKey, rows || []);
       resolve(rows || []);
     });
   });

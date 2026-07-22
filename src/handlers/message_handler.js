@@ -1,13 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import pino from 'pino';
-import { downloadMediaMessage, jidNormalizedUser } from '@itsliaaa/baileys';
 import { toolsSchema, executeTool } from '../../tools.js';
 import { processIncomingDocument } from '../services/document_processor.js';
 import { extractArticleUrl, unfurlAndSummarizeUrl } from '../services/link_unfurler.js';
 import { chatHistories } from './llm.js';
 import { getOpenRouterResponse } from './llm.js';
 import { saveChatMessage } from '../db/index.js';
+import { getDownloadMediaMessage, getJidNormalizedUser } from '../utils/baileys_loader.js';
 
 // Map untuk melacak status aktifasi Auto-OCR di setiap chat room (JID)
 export const ocrActiveRooms = new Map();
@@ -18,6 +18,12 @@ export const ocrActiveRooms = new Map();
 export async function handleIncomingMessage(sock, msg) {
   if (!msg || !msg.key || !msg.message) return;
 
+  // Lazy load baileys exports needed for message handling
+  const [jidNormalizedUser, downloadMediaMessage] = await Promise.all([
+    getJidNormalizedUser(),
+    getDownloadMediaMessage()
+  ]);
+  
   // Hanya memproses pesan masuk dari orang lain (bukan dari bot itu sendiri)
   if (!msg.key.fromMe) {
     const jid = msg.key.remoteJid;
