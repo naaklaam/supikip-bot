@@ -228,9 +228,10 @@ export async function downloadAndRegisterMangaSticker(mangaId, coverUrl, title) 
     fs.writeFileSync(tempFile, Buffer.from(arrayBuffer));
 
     // Convert using ImageMagick
-    // WhatsApp stickers must be square 512x512 WebP
-    const cmd = `convert "${tempFile}" -resize 512x512 -background none -gravity center -extent 512x512 "${finalPath}"`;
-    await execFileAsync(cmd);
+    // WhatsApp stickers must be square 512x512 WebP.
+    // We resize the cover to fit a 3:4 vertical area (384x512) and pad to 512x512 to preserve aspect ratio.
+    const cmd = `convert "${tempFile}" -resize 384x512 -background none -gravity center -extent 512x512 -strip -quality 75 "${finalPath}"`;
+    await execAsync(cmd);
 
     // Register sticker in DB with tag 'manga_' + mangaId
     await registerSticker(finalFilename, `manga_${mangaId}`, 'system');
