@@ -118,7 +118,7 @@ async function startBot() {
         console.log('Sesi keluar. Silakan hapus folder "sesi_speaki" dan jalankan ulang untuk scan QR.');
       }
     } else if (connection === 'open') {
-      reconnectAttempts = 0;
+      reconnectAttempts = 0; // Reset counter on successful connection
       console.log('==================================================');
       console.log('Speaki Bot telah sukses terhubung ke WhatsApp! 🎉');
       console.log('==================================================');
@@ -135,8 +135,10 @@ async function startBot() {
         }
       }
 
-      // Jalankan pemeriksaan update shinigami langsung setelah terhubung
-      checkShinigamiUpdates(sock);
+      // Jalankan pemeriksaan update shinigami setelah delay sebentar untuk memberi waktu koneksi stabil
+      setTimeout(() => {
+        checkShinigamiUpdates(sock);
+      }, 5000);
 
       // Jalankan pengecekan heartbeat untuk tugas berkala (jika ada)
       checkHeartbeat(sock);

@@ -387,14 +387,18 @@ export async function checkShinigamiUpdates(sock) {
           }
         }
 
-        const msg =
-          `📖 *${title}*\n` +
-          `📌 Chapter: *${chapterNum}*\n\n` +
-          `🔗 *Link Series:* ${webUrl}/series/${mangaId}\n` +
-          `⚡ *Link Baca:* ${webUrl}/chapter/${chapterId}`;
+        try {
+          const msg =
+            `📖 *${title}*\n` +
+            `📌 Chapter: *${chapterNum}*\n\n` +
+            `🔗 *Link Series:* ${webUrl}/series/${mangaId}\n` +
+            `⚡ *Link Baca:* ${webUrl}/chapter/${chapterId}`;
 
-        await sock.sendMessage(MANHWA_GROUP_JID, { text: msg });
-        console.log(`[Shinigami Scraper] Update terkirim ke WA: ${title} Chapter ${chapterNum}`);
+          await sock.sendMessage(MANHWA_GROUP_JID, { text: msg });
+          console.log(`[Shinigami Scraper] Update terkirim ke WA: ${title} Chapter ${chapterNum}`);
+        } catch (msgErr) {
+          console.error(`[Shinigami Scraper] Gagal mengirim pesan untuk "${title}":`, msgErr.message);
+        }
 
         // Update state secara dinamis & atomik setelah sukses terkirim
         state[mangaId] = {
