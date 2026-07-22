@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import { getOpenRouterModelName, getOpenRouterParamsWithDefaultMaxTokens } from './model_params.js';
 
 // Pattern URL reguler
 const URL_REGEX = /(https?:\/\/[^\s>]+)/gi;
@@ -78,7 +79,7 @@ export async function unfurlAndSummarizeUrl(url) {
     if (cleanText.length < 100) return null; // Teks terlalu pendek
 
     const apiKey = process.env.OPENROUTER_API_KEY;
-    const model = process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
+    const modelParams = getOpenRouterParamsWithDefaultMaxTokens(500);
     if (!apiKey) return null;
 
     // Panggil LLM cepat untuk ringkasan 3 poin
@@ -91,7 +92,8 @@ export async function unfurlAndSummarizeUrl(url) {
         'X-Title': 'Speaki Link Unfurler'
       },
       body: JSON.stringify({
-        model: model,
+        model: getOpenRouterModelName(),
+        ...modelParams,
         messages: [
           {
             role: 'system',
@@ -102,7 +104,6 @@ export async function unfurlAndSummarizeUrl(url) {
             content: `Judul Artikel: "${title}"\n\nTeks Artikel:\n${cleanText}`
           }
         ],
-        max_tokens: 500
       })
     });
 

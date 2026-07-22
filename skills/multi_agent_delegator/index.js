@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import { getOpenRouterModelName, getOpenRouterParamsWithDefaultMaxTokens } from '../../src/services/model_params.js';
 
 /**
  * Menjalankan 1 sub-agent terisolasi secara independen
@@ -9,7 +10,7 @@ async function runSingleSubagent(subagent, sock) {
   console.log(`[Multi-Agent] Memulai sub-agent: "${role_name}"`);
 
   const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
+  const modelParams = getOpenRouterParamsWithDefaultMaxTokens(1200);
   if (!apiKey) return `[SUB-AGENT ${role_name}]: Kunci API OpenRouter belum diatur.`;
 
   const systemPrompt = `${instruction}\n\nKamu adalah sub-agent terisolasi bernama "${role_name}". Berikan jawaban yang ringkas, tepat, dan langsung pada inti tugas tanpa basa-basi.`;
@@ -29,9 +30,9 @@ async function runSingleSubagent(subagent, sock) {
         'X-Title': `Speaki Subagent - ${role_name}`
       },
       body: JSON.stringify({
-        model: model,
+        model: getOpenRouterModelName(),
+        ...modelParams,
         messages: currentMessages,
-        max_tokens: 1200
       })
     });
 

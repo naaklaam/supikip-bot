@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { createRequire } from 'module';
 import { atomicWriteJsonSync, atomicWriteFileSync } from './src/utils/atomic_file.js';
 import { reloadCronSchedules } from './src/services/cron_scheduler.js';
+import { getOpenRouterModelName, getOpenRouterParams } from './src/services/model_params.js';
 
 const require = createRequire(import.meta.url);
 const pdf = require('pdf-parse');
@@ -885,7 +886,7 @@ async function analyzeImage(filename, prompt) {
     else if (ext === '.gif') mimeType = 'image/gif';
 
     const apiKey = process.env.OPENROUTER_API_KEY;
-    const model = process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
+    const modelParams = getOpenRouterParams();
 
     if (!apiKey) return 'Kunci API OpenRouter belum diatur di .env.';
 
@@ -898,7 +899,8 @@ async function analyzeImage(filename, prompt) {
         'X-Title': 'Speaki WhatsApp Bot - Vision'
       },
       body: JSON.stringify({
-        model: model,
+        model: getOpenRouterModelName(),
+        ...modelParams,
         messages: [
           {
             role: 'user',
@@ -931,7 +933,7 @@ async function delegateSubagent(instruction, task) {
   console.log(`[Tool: delegate_subagent] Memulai subagent untuk tugas: ${task}`);
   try {
     const apiKey = process.env.OPENROUTER_API_KEY;
-    const model = process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
+    const modelParams = getOpenRouterParams();
     if (!apiKey) return 'Kunci API OpenRouter belum diatur di .env.';
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -943,7 +945,8 @@ async function delegateSubagent(instruction, task) {
         'X-Title': 'Speaki WhatsApp Bot - Subagent'
       },
       body: JSON.stringify({
-        model: model,
+        model: getOpenRouterModelName(),
+        ...modelParams,
         messages: [
           { role: 'system', content: instruction },
           { role: 'user', content: task }

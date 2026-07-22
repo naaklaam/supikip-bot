@@ -4,9 +4,9 @@ import cron from 'node-cron';
 import { toolsSchema } from '../../tools.js';
 import { getSystemInstruction } from '../handlers/llm.js';
 import { atomicWriteJsonSync } from '../utils/atomic_file.js';
+import { getOpenRouterModelName, getOpenRouterParams } from '../services/model_params.js';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const MODEL_NAME = process.env.MODEL_NAME;
 const MANHWA_GROUP_JID = process.env.MANHWA_GROUP_JID || '';
 
 // Menyimpan daftar jobs cron yang sedang berjalan dan referensi socket WA
@@ -109,6 +109,7 @@ export function initCronSchedules(sock) {
         }
 
         try {
+          const modelParams = getOpenRouterParams();
           const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -118,7 +119,8 @@ export function initCronSchedules(sock) {
               'X-Title': 'Speaki WhatsApp Bot - Scheduled Cron'
             },
             body: JSON.stringify({
-              model: MODEL_NAME,
+              model: getOpenRouterModelName(),
+              ...modelParams,
               messages: messages,
               tools: toolsSchema
             })

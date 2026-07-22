@@ -2,9 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import { toolsSchema } from '../../tools.js';
 import { getSystemInstruction } from '../handlers/llm.js';
+import { getOpenRouterModelName, getOpenRouterParams } from '../services/model_params.js';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const MODEL_NAME = process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
 const MANHWA_GROUP_JID = process.env.MANHWA_GROUP_JID || '';
 
 /**
@@ -36,6 +36,7 @@ export async function checkHeartbeat(sock) {
 
       if (!OPENROUTER_API_KEY) return;
 
+      const modelParams = getOpenRouterParams();
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -45,7 +46,8 @@ export async function checkHeartbeat(sock) {
           'X-Title': 'Speaki WhatsApp Bot - Heartbeat'
         },
         body: JSON.stringify({
-          model: MODEL_NAME,
+          model: getOpenRouterModelName(),
+          ...modelParams,
           messages: messages,
           tools: toolsSchema
         })

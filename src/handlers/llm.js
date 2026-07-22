@@ -3,6 +3,7 @@ import path from 'path';
 import { toolsSchema, executeTool } from '../../tools.js';
 import { getRelevantMemoryContext } from '../db/index.js';
 import { checkShinigamiUpdates, resolvedShinigamiDomains } from '../services/shinigami_scraper.js';
+import { getOpenRouterModelName, getOpenRouterParamsWithDefaultMaxTokens } from '../services/model_params.js';
 
 // Memori percakapan sementara untuk menyimpan riwayat obrolan (maksimal 10 pesan per JID)
 // Struktur: { messages: [], lastAccessed: timestamp }
@@ -108,6 +109,7 @@ export async function getOpenRouterResponse(jid, sock, msg) {
 
   try {
     let maxIterations = 15; // Maksimal 15 iterasi tool call per turn
+    const modelParams = getOpenRouterParamsWithDefaultMaxTokens(1500);
 
     while (maxIterations-- > 0) {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -119,10 +121,10 @@ export async function getOpenRouterResponse(jid, sock, msg) {
           'X-Title': 'Speaki WhatsApp Bot'
         },
         body: JSON.stringify({
-          model: process.env.MODEL_NAME,
+          model: getOpenRouterModelName(),
+          ...modelParams,
           messages: currentMessages,
           tools: toolsSchema,
-          max_tokens: 1500 // Batas aman output untuk mencegah runaway/looping generation
         })
       });
 
