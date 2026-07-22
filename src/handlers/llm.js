@@ -108,10 +108,28 @@ export async function getOpenRouterResponse(jid, sock, msg) {
   ];
 
   try {
-    let maxIterations = 15; // Maksimal 15 iterasi tool call per turn
+    let maxIterations = 10; // Maksimal 10 iterasi tool call per turn untuk hemat token dan mengurangi latency
     const modelParams = getOpenRouterParamsWithDefaultMaxTokens(1500);
 
     while (maxIterations-- > 0) {
+      const isLastIteration = (maxIterations === 0);
+      
+      const requestPayload = {
+        model: getOpenRouterModelName(),
+        ...modelParams,
+        messages: currentMessages
+      };
+
+      if (isLastIteration) {
+        // Pada iterasi terakhir, paksa LLM untuk merangkum hasil yang diperoleh tanpa memanggil tool lagi
+        currentMessages.push({
+          role: 'system',
+          content: 'System: Batas pencarian/pemanggilan tool telah dicapai. Harap berikan jawaban terbaik yang bisa disimpulkan berdasarkan data atau hasil pemanggilan tool yang telah diperoleh di atas. Jangan memanggil tool baru lagi.'
+        });
+      } else {
+        requestPayload.tools = toolsSchema;
+      }
+
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -120,12 +138,7 @@ export async function getOpenRouterResponse(jid, sock, msg) {
           'HTTP-Referer': 'https://github.com/itsliaaa/baileys',
           'X-Title': 'Speaki WhatsApp Bot'
         },
-        body: JSON.stringify({
-          model: getOpenRouterModelName(),
-          ...modelParams,
-          messages: currentMessages,
-          tools: toolsSchema,
-        })
+        body: JSON.stringify(requestPayload)
       });
 
       const data = await response.json();
@@ -136,8 +149,8 @@ export async function getOpenRouterResponse(jid, sock, msg) {
         return 'Eh? Speaki bingung... API OpenRouter ngasih jawaban kosong.';
       }
 
-      // Jika LLM meminta pemanggilan tool (function calling)
-      if (message.tool_calls && message.tool_calls.length > 0) {
+      // Jika LLM meminta pemanggilan tool (function calling) dan ini bukan iterasi terakhir
+      if (message.tool_calls && message.tool_calls.length > 0 && !isLastIteration) {
         console.log(`[OpenRouter Tool Call] LLM meminta pemanggilan ${message.tool_calls.length} tool(s).`);
 
         // Masukkan assistant message (berisi tool_calls) ke currentMessages run ini
@@ -186,7 +199,7 @@ export async function getOpenRouterResponse(jid, sock, msg) {
       }
     }
 
-    return 'Batas iterasi pemanggilan tool berantai terlampaui.';
+    return 'Maaf, saya tidak dapat menyelesaikan pencarian seluruhnya, namun data di atas adalah hasil terbaik yang bisa saya peroleh.';
   } catch (error) {
     console.error('Error saat menghubungi OpenRouter:', error);
     return 'Aduh! Gagal konek ke OpenRouter. Coba cek internet atau kuota API-nya!';
