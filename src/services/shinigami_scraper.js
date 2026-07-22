@@ -209,6 +209,7 @@ export async function downloadAndRegisterMangaSticker(mangaId, coverUrl, title) 
   }
 
   const tempFile = path.join(process.cwd(), `temp_${mangaId}`);
+  const tempPng = path.join(process.cwd(), `temp_${mangaId}.png`);
   const stikerDbDir = path.join(process.cwd(), 'stiker_db');
   const finalFilename = `manga_${mangaId}.webp`;
   const finalPath = path.join(stikerDbDir, finalFilename);
@@ -227,11 +228,14 @@ export async function downloadAndRegisterMangaSticker(mangaId, coverUrl, title) 
     const arrayBuffer = await response.arrayBuffer();
     fs.writeFileSync(tempFile, Buffer.from(arrayBuffer));
 
-    // Convert using ImageMagick
-    // WhatsApp stickers must be square 512x512 WebP.
-    // We resize the cover to fit a 3:4 vertical area (384x512) and pad to 512x512 to preserve aspect ratio.
-    const cmd = `convert "${tempFile}" -resize 384x512 -background none -gravity center -extent 512x512 -strip -quality 75 "${finalPath}"`;
-    await execAsync(cmd);
+    // Tahap 1: Gunakan ImageMagick untuk resize & pad cover manhwa menjadi PNG transparan 512x512 (rasio vertikal 3:4)
+    const resizeCmd = `convert "${tempFile}" -resize 384x512 -background none -gravity center -extent 512x512 "${tempPng}"`;
+    await execAsync(resizeCmd);
+
+    // Tahap 2: Gunakan cwebp resmi Google untuk enkode PNG menjadi WebP standar WhatsApp yang bersih
+    const cwebpPath = fs.existsSync('/home/linuxbrew/.linuxbrew/bin/cwebp') ? '/home/linuxbrew/.linuxbrew/bin/cwebp' : 'cwebp';
+    const encodeCmd = `"${cwebpPath}" -q 75 "${tempPng}" -o "${finalPath}"`;
+    await execAsync(encodeCmd);
 
     // Register sticker in DB with tag 'manga_' + mangaId
     await registerSticker(finalFilename, `manga_${mangaId}`, 'system');
@@ -246,6 +250,9 @@ export async function downloadAndRegisterMangaSticker(mangaId, coverUrl, title) 
     try {
       if (fs.existsSync(tempFile)) {
         fs.unlinkSync(tempFile);
+      }
+      if (fs.existsSync(tempPng)) {
+        fs.unlinkSync(tempPng);
       }
     } catch (e) {}
   }
@@ -294,21 +301,12 @@ export async function checkShinigamiUpdates(sock) {
       isFirstRun = true;
     }
 
-    const newState = {};
     const updates = [];
 
     // Memproses item secara terbalik (dari yang lama ke baru) agar urutan pengiriman sesuai
     for (const item of [...currentList].reverse()) {
       const mangaId = item.manga_id;
-      const title = item.title;
       const chapterId = item.latest_chapter_id;
-      const chapterNum = item.latest_chapter_number;
-
-      newState[mangaId] = {
-        latest_chapter_id: chapterId,
-        latest_chapter_number: chapterNum,
-        title: title
-      };
 
       if (!isFirstRun) {
         const oldItem = state[mangaId];
@@ -318,14 +316,20 @@ export async function checkShinigamiUpdates(sock) {
       }
     }
 
-    // Simpan state baru secara atomik
-    try {
-      atomicWriteJsonSync(SHINIGAMI_STATE_FILE, newState);
-    } catch (e) {
-      console.error("[Shinigami Scraper] Gagal menyimpan berkas state:", e.message);
-    }
-
     if (isFirstRun) {
+      const initialState = {};
+      for (const item of currentList) {
+        initialState[item.manga_id] = {
+          latest_chapter_id: item.latest_chapter_id,
+          latest_chapter_number: item.latest_chapter_number,
+          title: item.title
+        };
+      }
+      try {
+        atomicWriteJsonSync(SHINIGAMI_STATE_FILE, initialState);
+      } catch (e) {
+        console.error("[Shinigami Scraper] Gagal menyimpan berkas state awal:", e.message);
+      }
       console.log("[Shinigami Scraper] Pengecekan pertama selesai. State awal diinisialisasi.");
       return;
     }
@@ -343,6 +347,15 @@ export async function checkShinigamiUpdates(sock) {
 
         if (!isTrackedManhwa(title, trackedTitles)) {
           console.log(`[Shinigami Scraper] Melewati "${title}" (tidak ada di list-manhwa.md)`);
+          // Tetap simpan state untuk item yang di-skip agar tidak terdeteksi ulang
+          state[mangaId] = {
+            latest_chapter_id: chapterId,
+            latest_chapter_number: chapterNum,
+            title: title
+          };
+          try {
+            atomicWriteJsonSync(SHINIGAMI_STATE_FILE, state);
+          } catch (e) {}
           continue;
         }
 
@@ -382,6 +395,18 @@ export async function checkShinigamiUpdates(sock) {
 
         await sock.sendMessage(MANHWA_GROUP_JID, { text: msg });
         console.log(`[Shinigami Scraper] Update terkirim ke WA: ${title} Chapter ${chapterNum}`);
+
+        // Update state secara dinamis & atomik setelah sukses terkirim
+        state[mangaId] = {
+          latest_chapter_id: chapterId,
+          latest_chapter_number: chapterNum,
+          title: title
+        };
+        try {
+          atomicWriteJsonSync(SHINIGAMI_STATE_FILE, state);
+        } catch (e) {
+          console.error("[Shinigami Scraper] Gagal memperbarui state untuk:", title, e.message);
+        }
       }
     } else {
       console.log("[Shinigami Scraper] Tidak ada update manhwa baru.");
