@@ -360,12 +360,16 @@ export async function checkShinigamiUpdates(sock) {
         }
 
         const { getManhwaGroupJids } = await import('../utils/session_helper.js');
+        const { getCachedGroupNames } = await import('../utils/group_resolver.js');
         const targetJids = getManhwaGroupJids();
+        const groupNames = getCachedGroupNames();
 
         if (targetJids.length === 0) {
           console.log(`[Shinigami Scraper] Tidak ada target JID grup manhwa terkonfigurasi.`);
           continue;
         }
+
+        const getGroupLabel = (jid) => groupNames[jid] ? `${groupNames[jid]} (${jid})` : jid;
 
         // Ambil atau unduh stiker cover manga
         let stickerRow = await getRandomStickerByTag(`manga_${mangaId}`);
@@ -384,7 +388,7 @@ export async function checkShinigamiUpdates(sock) {
             for (const targetJid of targetJids) {
               try {
                 await sock.sendMessage(targetJid, { sticker: fs.readFileSync(stickerPath) });
-                console.log(`[Shinigami Scraper] Stiker cover terkirim ke WA (${targetJid}) untuk: ${title}`);
+                console.log(`[Shinigami Scraper] Stiker cover terkirim ke WA (${getGroupLabel(targetJid)}) untuk: ${title}`);
               } catch (stickerErr) {
                 console.error(`[Shinigami Scraper] Gagal mengirim stiker cover ke ${targetJid} untuk "${title}":`, stickerErr.message);
               }
@@ -401,7 +405,7 @@ export async function checkShinigamiUpdates(sock) {
         for (const targetJid of targetJids) {
           try {
             await sock.sendMessage(targetJid, { text: msg });
-            console.log(`[Shinigami Scraper] Update terkirim ke WA (${targetJid}): ${title} Chapter ${chapterNum}`);
+            console.log(`[Shinigami Scraper] Update terkirim ke WA (${getGroupLabel(targetJid)}): ${title} Chapter ${chapterNum}`);
           } catch (msgErr) {
             console.error(`[Shinigami Scraper] Gagal mengirim pesan ke ${targetJid} untuk "${title}":`, msgErr.message);
           }
