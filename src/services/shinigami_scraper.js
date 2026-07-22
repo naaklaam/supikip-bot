@@ -359,12 +359,11 @@ export async function checkShinigamiUpdates(sock) {
           continue;
         }
 
-        const targetJids = MANHWA_GROUP_JID
-          ? MANHWA_GROUP_JID.split(',').map(j => j.trim()).filter(Boolean)
-          : [];
+        const { getManhwaGroupJids } = await import('../utils/session_helper.js');
+        const targetJids = getManhwaGroupJids();
 
         if (targetJids.length === 0) {
-          console.log(`[Shinigami Scraper] MANHWA_GROUP_JID belum diatur di .env, melempar pesan WA.`);
+          console.log(`[Shinigami Scraper] Tidak ada target JID grup manhwa terkonfigurasi.`);
           continue;
         }
 

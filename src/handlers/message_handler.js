@@ -8,6 +8,7 @@ import { chatHistories } from './llm.js';
 import { getOpenRouterResponse } from './llm.js';
 import { saveChatMessage } from '../db/index.js';
 import { getDownloadMediaMessage, getJidNormalizedUser } from '../utils/baileys_loader.js';
+import { getSessionJid } from '../utils/session_helper.js';
 
 // Map untuk melacak status aktifasi Auto-OCR di setiap chat room (JID)
 export const ocrActiveRooms = new Map();
@@ -27,6 +28,7 @@ export async function handleIncomingMessage(sock, msg) {
   // Hanya memproses pesan masuk dari orang lain (bukan dari bot itu sendiri)
   if (!msg.key.fromMe) {
     const jid = msg.key.remoteJid;
+    const sessionJid = getSessionJid(jid);
     const documentMessage = msg.message?.documentMessage ||
       msg.message?.documentWithCaptionMessage?.message?.documentMessage;
 
@@ -219,7 +221,7 @@ export async function handleIncomingMessage(sock, msg) {
 
     if (promptText || documentInfo) {
       // Simpan pesan masuk ke database SQLite (Pencatatan Long-Term Memory FTS5)
-      saveChatMessage(jid, senderName, senderJid, promptText || 'Mengirim berkas', 0);
+      saveChatMessage(sessionJid, senderName, senderJid, promptText || 'Mengirim berkas', 0);
 
       // Format isi pesan agar LLM tahu siapa yang berbicara dan apa isi dokumen yang dikirim
       let formattedMessage = `[${senderName}]: ${promptText}`;
@@ -232,10 +234,10 @@ export async function handleIncomingMessage(sock, msg) {
       }
 
       // Simpan pesan ke riwayat obrolan JID ini terlebih dahulu untuk mempertahankan konteks
-      if (!chatHistories.has(jid)) {
-        chatHistories.set(jid, { messages: [], lastAccessed: Date.now() });
+      if (!chatHistories.has(sessionJid)) {
+        chatHistories.set(sessionJid, { messages: [], lastAccessed: Date.now() });
       }
-      const chatData = chatHistories.get(jid);
+      const chatData = chatHistories.get(sessionJid);
       chatData.lastAccessed = Date.now();
       const history = chatData.messages;
 
@@ -301,7 +303,7 @@ export async function handleIncomingMessage(sock, msg) {
         const replyText = await getOpenRouterResponse(jid, sock, msg);
 
         // Simpan balasan bot ke database SQLite (Pencatatan Long-Term Memory FTS5)
-        saveChatMessage(jid, 'Speaki ⚙️🤖', botJid, replyText, 1);
+        saveChatMessage(sessionJid, 'Speaki ⚙️🤖', botJid, replyText, 1);
 
         // Kirim balasan ke pengguna (diquote ke pesan pengirim)
         await sock.sendMessage(jid, { text: replyText }, { quoted: msg });

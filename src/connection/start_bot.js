@@ -123,6 +123,15 @@ async function startBot() {
       console.log('Speaki Bot telah sukses terhubung ke WhatsApp! 🎉');
       console.log('==================================================');
 
+      // Perbarui cache nama grup WhatsApp
+      try {
+        const { updateGroupNamesCache } = await import('../utils/group_resolver.js');
+        await updateGroupNamesCache(sock);
+        console.log('[Group Resolver] Berhasil memperbarui cache daftar grup WhatsApp.');
+      } catch (err) {
+        console.error('[Group Resolver] Gagal memperbarui cache nama grup:', err.message);
+      }
+
       // Inisialisasi Database SQLite3 lokal secara sinkron sebelum fitur memori berjalan
       if (!databaseInitialized) {
         try {

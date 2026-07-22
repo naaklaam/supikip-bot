@@ -5,6 +5,8 @@ import { getRelevantMemoryContext } from '../db/index.js';
 import { checkShinigamiUpdates, resolvedShinigamiDomains } from '../services/shinigami_scraper.js';
 import { getOpenRouterModelName, getOpenRouterParamsWithDefaultMaxTokens } from '../services/model_params.js';
 
+import { getSessionJid } from '../utils/session_helper.js';
+
 // Memori percakapan sementara untuk menyimpan riwayat obrolan (maksimal 10 pesan per JID)
 // Struktur: { messages: [], lastAccessed: timestamp }
 export const chatHistories = new Map();
@@ -82,11 +84,12 @@ export async function getOpenRouterResponse(jid, sock, msg) {
     return 'Waduh! Kunci API OpenRouter belum diatur di file .env nya!';
   }
 
+  const sessionJid = getSessionJid(jid);
   const now = Date.now();
-  let chatData = chatHistories.get(jid);
+  let chatData = chatHistories.get(sessionJid);
   if (!chatData) {
     chatData = { messages: [], lastAccessed: now };
-    chatHistories.set(jid, chatData);
+    chatHistories.set(sessionJid, chatData);
   } else {
     chatData.lastAccessed = now;
   }
@@ -94,7 +97,7 @@ export async function getOpenRouterResponse(jid, sock, msg) {
 
   // Dapatkan memori FTS5 yang relevan dengan pesan pengguna dari SQLite
   const lastUserMsg = history.slice().reverse().find(m => m.role === 'user')?.content || '';
-  const ftsMemoryContext = await getRelevantMemoryContext(lastUserMsg, jid);
+  const ftsMemoryContext = await getRelevantMemoryContext(lastUserMsg, sessionJid);
 
   let finalSystemInstruction = getSystemInstruction();
   if (ftsMemoryContext) {
