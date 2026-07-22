@@ -172,7 +172,7 @@ export async function handleIncomingMessage(sock, msg) {
           );
 
           if (buffer) {
-            const { performOCR } = await import('../skills/ocr_extractor/index.js');
+            const { performOCR } = await import('../../skills/ocr_extractor/index.js');
             const ocrResult = await performOCR(buffer);
 
             // Kirim kembali hasil ekstraksi sebagai balasan (reply/quote) langsung ke gambar bersangkutan
