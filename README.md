@@ -71,6 +71,7 @@ Bot dilengkapi dengan tools statis bawaan di **[tools.js](file:///home/naaklaam/
 11. **`delegate_subagent`**: Delegasi sub-percakapan terisolasi dengan LLM.
 12. **`run_performance_test`**: (Owner Only via pemicu `"speaki dev test"`) Menguji latensi API OpenRouter dan kecepatan I/O server.
 13. **`send_workspace_file`**: Mengirimkan berkas dokumen/file dari direktori server lokal langsung ke chat WhatsApp.
+14. **`read_chat_history`**: Membaca riwayat pesan terakhir dari grup atau kontak tertentu berdasarkan nama grup (fuzzy matching) atau JID langsung dari database SQLite.
 
 ---
 
@@ -102,6 +103,9 @@ Bot secara otomatis memindai direktori [skills/](file:///home/naaklaam/Supikip/s
 *   **[self_learning](file:///home/naaklaam/Supikip/skills/self_learning)**:
     *   *Fungsi*: `learn_preference`
     *   *Deskripsi*: Menyimpan aturan baru, koreksi pengguna, atau preferensi khusus yang diajarkan pengguna secara otomatis ke database SQLite FTS5 tanpa membengkakkan file `CORE_IDENTITY.md`.
+*   **[cross_group_forwarder](file:///home/naaklaam/Supikip/skills/cross_group_forwarder)**:
+    *   *Fungsi*: `forward_group_message`
+    *   *Deskripsi*: Meneruskan (forward) pesan yang di-reply (quoted) atau mengirimkan teks baru ke satu atau beberapa grup tujuan dengan nama grup (fuzzy matching) atau JID.
 
 ### Cara Menambahkan Skill Baru:
 Buat folder baru di bawah `skills/` (misal: `skills/hello_world/`) yang wajib berisi:
@@ -179,8 +183,21 @@ Bot memiliki sistem pengolahan dokumen terintegrasi ([document_processor.js](fil
 Bot secara otomatis memantau update rilisan Manhwa/Manga secara berkala:
 
 *   **Pemeriksaan Berkala**: Pengecekan dilakukan secara background non-blocking setiap 15 menit (sesuai `MANHWA_CHECK_INTERVAL`).
-*   **Filter Daftar Judul Dipantau**: Hanya seri Manhwa yang judulnya tercantum di file **[list-manhwa.md](file:///home/naaklaam/Supikip/list-manhwa.md)** yang akan dikirimkan pemberitahuannya ke grup WhatsApp. Rilisan judul lain yang tidak ada di daftar akan diabaikan dari pengiriman WA.
-*   **Pelacakan State**: State chapter terakhir disimpan di `last_manhwa.json` untuk mencegah pemberitahuan ganda.
+*   **Filter Daftar Judul Dipantau**: Hanya seri Manhwa yang judulnya tercantum di file **[list-manhwa.md](file:///home/naaklaam/Supikip/list-manhwa.md)** yang akan dikirimkan pemberitahuannya ke grup WhatsApp.
+*   **Target Grup Dinamis**: Mendukung pengiriman ke beberapa target grup sekaligus menggunakan JID langsung (`MANHWA_GROUP_JID`) atau nama grup asli (`MANHWA_GROUP_NAMES`) yang dipisahkan koma di file `.env`. Nama grup diterjemahkan secara otomatis menggunakan cache grup dari Baileys.
+*   **Konversi Stiker Sampul Otomatis (WebP WhatsApp-Compliant)**: Secara otomatis mengambil cover manhwa, memotong/mengisi dengan rasio 3:4 dengan transparansi menggunakan ImageMagick `convert`, dan mengompresnya menggunakan `cwebp` menjadi file WebP di bawah 100 KB agar terkirim bersih sebagai stiker cover di WhatsApp.
+*   **Pelacakan State**: State chapter terakhir disimpan di `last_manhwa.json` secara atomik per-item setelah pesan sukses terkirim ke WhatsApp untuk keandalan maksimal.
+
+---
+
+## 👥 Penyatuan Sesi Obrolan & Memori Bersama Lintas Grup (Multi-Group Orchestration)
+
+Untuk grup-grup manhwa yang terkonfigurasi di `.env` (via JID maupun nama grup), bot menerapkan sistem penyatuan sesi obrolan (LLM chat history) dan pencatatan riwayat SQLite FTS5 di bawah JID virtual `'shared_manhwa_groups'`:
+*   **Berbagi Memori & Konteks**: Semua grup manhwa berbagi riwayat obrolan dan pencarian memori jangka panjang yang sama secara sinkron.
+*   **Pelabelan Sumber Grup**: Untuk mencegah kebingungan obrolan, bot secara otomatis menambahkan label asal grup:
+    *   **LLM Context**: Diformat menjadi `[Nama Pengirim di Nama Grup]` (misal: `[JO di Punini Raven]`).
+    *   **SQLite DB**: Disimpan sebagai `Nama Pengirim (di Nama Grup)` untuk pesan masuk, dan `Speaki ⚙️🤖 (di Nama Grup)` untuk balasan bot.
+*   **Log Systemd Human-Readable**: Semua pengiriman pesan dan logs di journalctl mencetak nama grup asli di samping JID, mempermudah pemantauan (contoh: `Grup Utama (120363407159758205@g.us)`).
 
 ---
 
