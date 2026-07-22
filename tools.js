@@ -531,6 +531,30 @@ const staticSchema = [
         required: ["filename"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_chat_history",
+      description: "Membaca riwayat pesan terakhir dari grup atau kontak tertentu berdasarkan nama grup atau JID.",
+      parameters: {
+        type: "object",
+        properties: {
+          group_name: {
+            type: "string",
+            description: "Nama grup atau alias yang dicari (fuzzy matching, misal: 'punini' atau 'gang')."
+          },
+          jid: {
+            type: "string",
+            description: "JID target grup/kontak secara langsung jika diketahui (misal: '120363322107836319@g.us')."
+          },
+          limit: {
+            type: "integer",
+            description: "Jumlah riwayat pesan terakhir yang ingin dimuat (default: 15)."
+          }
+        }
+      }
+    }
   }
 ];
 
@@ -1134,6 +1158,8 @@ export async function executeTool(name, args, sock, checkShinigamiUpdatesFn, ext
       return await runPerformanceTest();
     case 'send_workspace_file':
       return await sendWorkspaceFile(args.filename, args.caption, sock, extraContext);
+    case 'read_chat_history':
+      return await readChatHistory(extraContext, args);
     default:
       // Coba memuat dan mengeksekusi skill dinamis dari folder skills/ jika tersedia
       if (loadedSkills.has(name)) {
@@ -1152,3 +1178,73 @@ export async function executeTool(name, args, sock, checkShinigamiUpdatesFn, ext
       return `Tool dengan nama "${name}" tidak ditemukan di database tools Speaki.`;
   }
 }
+
+/**
+ * Membaca riwayat pesan terakhir dari SQLite menggunakan pencarian nama grup/JID
+ */
+async function readChatHistory(extraContext, args) {
+  const { group_name, jid, limit = 15 } = args;
+  const sqlite3 = (await import('sqlite3')).default;
+  const path = await import('path');
+  const fs = await import('fs');
+  const { getCachedGroupNames } = await import('./src/utils/group_resolver.js');
+  const { getSessionJid } = await import('./src/utils/session_helper.js');
+
+  let targetJid = jid;
+
+  if (group_name) {
+    const cache = getCachedGroupNames();
+    const normalizedQuery = group_name.toLowerCase().trim();
+    // Pencarian fuzzy parsial pada nama grup
+    const matchedJids = Object.keys(cache).filter(k => 
+      cache[k].toLowerCase().includes(normalizedQuery)
+    );
+
+    if (matchedJids.length === 0) {
+      return `Grup dengan nama "${group_name}" tidak ditemukan di memori cache bot.`;
+    }
+    if (matchedJids.length > 1) {
+      const matchDetails = matchedJids.map(k => `- ${cache[k]} (${k})`).join('\n');
+      return `Ditemukan beberapa grup yang cocok dengan "${group_name}":\n${matchDetails}\n\nHarap tentukan nama grup yang lebih spesifik.`;
+    }
+    targetJid = matchedJids[0];
+  }
+
+  if (!targetJid) {
+    return 'Harap tentukan nama grup atau JID target.';
+  }
+
+  // Petakan ke session JID bersama jika termasuk grup manhwa
+  const sessionJid = getSessionJid(targetJid);
+
+  const dbPath = path.join(process.cwd(), 'speaki.db');
+  return new Promise((resolve) => {
+    const db = new sqlite3.Database(dbPath);
+    db.all(
+      `SELECT sender_name, message_text, timestamp, is_bot FROM chat_messages_history 
+       WHERE jid = ? ORDER BY timestamp DESC LIMIT ?`,
+      [sessionJid, limit],
+      (err, rows) => {
+        db.close();
+        if (err) {
+          return resolve(`Gagal membaca riwayat pesan dari database: ${err.message}`);
+        }
+        if (!rows || rows.length === 0) {
+          return resolve(`Tidak ada riwayat pesan terekam untuk grup/kontak ini (${sessionJid}).`);
+        }
+
+        // Urutkan balik agar kronologis (dari terlama ke terbaru)
+        const formatted = rows.reverse().map(r => {
+          const time = new Date(r.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+          const role = r.is_bot ? 'Bot' : 'User';
+          return `[${time}] ${r.sender_name} (${role}): ${r.message_text}`;
+        }).join('\n');
+
+        const cache = getCachedGroupNames();
+        const groupNameLabel = cache[targetJid] || 'Unknown';
+        resolve(`--- RIWAYAT PESAN GRUP: ${groupNameLabel} (${targetJid}) ---\n${formatted}`);
+      }
+    );
+  });
+}
+
