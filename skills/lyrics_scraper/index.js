@@ -24,12 +24,20 @@ export async function execute(args, sock, extraContext = {}) {
     if (res.ok) {
       const data = await res.json();
       if (data && data.length > 0) {
-        // Ambil kecocokan pertama (terbaik)
-        const bestMatch = data[0];
-        const lyrics = bestMatch.plainLyrics || bestMatch.syncedLyrics;
-        if (lyrics && lyrics.trim().length > 50) {
-          console.log(`[Skill: lyrics_scraper] Lirik berhasil diperoleh dari Lyricsfy/LRCLib.`);
-          return `🎤 *[LIRIK LAGU - LYRICSify]*\n\n*Judul:* ${bestMatch.name}\n*Artis:* ${bestMatch.artistName}\n*Album:* ${bestMatch.albumName || '-'}\n\n${lyrics}`;
+        // Cari hasil pertama yang memiliki syncedLyrics (lirik dengan timestamp LRC)
+        let bestMatch = data.find(item => item.syncedLyrics && item.syncedLyrics.trim().length > 50);
+        let lyricsType = 'LYRICSify (Synced)';
+        
+        // Jika tidak ada yang bersinkronisasi, cari yang memiliki plainLyrics biasa
+        if (!bestMatch) {
+          bestMatch = data.find(item => item.plainLyrics && item.plainLyrics.trim().length > 50);
+          lyricsType = 'LYRICSify (Plain)';
+        }
+
+        if (bestMatch) {
+          const lyrics = bestMatch.syncedLyrics || bestMatch.plainLyrics;
+          console.log(`[Skill: lyrics_scraper] Lirik berhasil diperoleh dari Lyricsfy/LRCLib (${lyricsType}).`);
+          return `🎤 *[LIRIK LAGU - ${lyricsType.toUpperCase()}]*\n\n*Judul:* ${bestMatch.name}\n*Artis:* ${bestMatch.artistName}\n*Album:* ${bestMatch.albumName || '-'}\n\n${lyrics}`;
         }
       }
     }
