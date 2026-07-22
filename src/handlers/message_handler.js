@@ -43,6 +43,8 @@ export async function handleIncomingMessage(sock, msg) {
 
     const sticker = msg.message?.stickerMessage;
     const isGroup = jid.endsWith('@g.us');
+    const groupNames = getCachedGroupNames();
+    const groupName = isGroup ? (groupNames[jid] || 'Grup') : '';
     const senderJid = msg.key.participant || msg.key.remoteJid;
     const senderNumber = senderJid.split('@')[0];
     const senderName = msg.pushName || senderNumber;
@@ -221,11 +223,14 @@ export async function handleIncomingMessage(sock, msg) {
     }
 
     if (promptText || documentInfo) {
-      // Simpan pesan masuk ke database SQLite (Pencatatan Long-Term Memory FTS5)
-      saveChatMessage(sessionJid, senderName, senderJid, promptText || 'Mengirim berkas', 0);
+      const groupLabel = isGroup ? ` di ${groupName}` : '';
+      const dbSenderName = isGroup ? `${senderName} (di ${groupName})` : senderName;
 
-      // Format isi pesan agar LLM tahu siapa yang berbicara dan apa isi dokumen yang dikirim
-      let formattedMessage = `[${senderName}]: ${promptText}`;
+      // Simpan pesan masuk ke database SQLite (Pencatatan Long-Term Memory FTS5)
+      saveChatMessage(sessionJid, dbSenderName, senderJid, promptText || 'Mengirim berkas', 0);
+
+      // Format isi pesan agar LLM tahu siapa yang berbicara dan di grup mana
+      let formattedMessage = `[${senderName}${groupLabel}]: ${promptText}`;
       if (documentInfo) {
         formattedMessage += `\n\n[LAMPIRAN DOKUMEN: ${documentInfo.fileName}]\n` +
           `📁 Tipe: ${documentInfo.fileType}\n` +
@@ -276,8 +281,7 @@ export async function handleIncomingMessage(sock, msg) {
           isReplyToBot ||
           hasNameMention;
 
-        const groupNames = getCachedGroupNames();
-        const groupLabel = groupNames[jid] ? `${groupNames[jid]} (${jid})` : jid;
+        const groupLabel = groupName ? `${groupName} (${jid})` : jid;
         console.log(`[Pesan Grup dari ${senderName} di ${groupLabel}] (Mentioned: ${isMentioned}): ${text}`);
 
         if (isMentioned) {
@@ -305,8 +309,10 @@ export async function handleIncomingMessage(sock, msg) {
         // Dapatkan balasan dari OpenRouter dengan dukungan pemanggilan tools
         const replyText = await getOpenRouterResponse(jid, sock, msg);
 
+        const dbBotName = isGroup ? `Speaki ⚙️🤖 (di ${groupName})` : 'Speaki ⚙️🤖';
+
         // Simpan balasan bot ke database SQLite (Pencatatan Long-Term Memory FTS5)
-        saveChatMessage(sessionJid, 'Speaki ⚙️🤖', botJid, replyText, 1);
+        saveChatMessage(sessionJid, dbBotName, botJid, replyText, 1);
 
         // Kirim balasan ke pengguna (diquote ke pesan pengirim)
         await sock.sendMessage(jid, { text: replyText }, { quoted: msg });
