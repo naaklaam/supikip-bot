@@ -25,6 +25,7 @@ speaki.db
 last_manhwa.json
 serpapi_quota.json
 group_names.json
+gmail_tokens.json
 sesi_speaki/
 
 # Dependensi & Pustaka Lokal

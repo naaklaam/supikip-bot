@@ -211,17 +211,21 @@ function loadDynamicSkills() {
             const jsonMatch = mdContent.match(/```json\s*([\s\S]*?)\s*```/);
             if (jsonMatch) {
               const rawSchema = JSON.parse(jsonMatch[1]);
-              const validation = validateSkillSchema(rawSchema, registeredNames);
-              if (validation.valid && validation.normalizedSchema) {
-                const schema = validation.normalizedSchema;
-                dynamicSchemas.push(schema);
-                registeredNames.add(schema.function.name);
+              const schemasToRegister = Array.isArray(rawSchema) ? rawSchema : [rawSchema];
+              
+              for (const singleSchema of schemasToRegister) {
+                const validation = validateSkillSchema(singleSchema, registeredNames);
+                if (validation.valid && validation.normalizedSchema) {
+                  const schema = validation.normalizedSchema;
+                  dynamicSchemas.push(schema);
+                  registeredNames.add(schema.function.name);
 
-                // Daftarkan jalur berkas index.js untuk diimpor saat eksekusi
-                loadedSkills.set(schema.function.name, execJsPath);
-                console.log(`[Skills Loader] Sukses memuat & memvalidasi skill dinamis: ${schema.function.name}`);
-              } else {
-                console.warn(`[Skills Loader] Melewati skill di folder '${item}': ${validation.error}`);
+                  // Daftarkan jalur berkas index.js untuk diimpor saat eksekusi
+                  loadedSkills.set(schema.function.name, execJsPath);
+                  console.log(`[Skills Loader] Sukses memuat & memvalidasi skill dinamis: ${schema.function.name}`);
+                } else {
+                  console.warn(`[Skills Loader] Melewati sub-skill di folder '${item}': ${validation.error}`);
+                }
               }
             } else {
               console.warn(`[Skills Loader] Blok skema JSON tidak ditemukan di SKILL.md untuk folder '${item}'`);
@@ -1167,7 +1171,8 @@ export async function executeTool(name, args, sock, checkShinigamiUpdatesFn, ext
           const execJsPath = loadedSkills.get(name);
           const skillModule = await import(execJsPath);
           if (typeof skillModule.execute === 'function') {
-            return await skillModule.execute(args, sock, extraContext);
+            const enrichedContext = { ...extraContext, toolName: name };
+            return await skillModule.execute(args, sock, enrichedContext);
           } else {
             return `Gagal mengeksekusi skill "${name}": Fungsi ekspor "execute" tidak ditemukan di index.js.`;
           }
