@@ -41,6 +41,40 @@ export async function handleIncomingMessage(sock, msg) {
       documentMessage?.caption ||
       '';
 
+    // Deteksi jika pesan ini merupakan reply/quote terhadap pesan lain
+    const contextInfo = msg.message?.extendedTextMessage?.contextInfo ||
+      msg.message?.imageMessage?.contextInfo ||
+      msg.message?.videoMessage?.contextInfo ||
+      msg.message?.stickerMessage?.contextInfo ||
+      msg.message?.documentMessage?.contextInfo ||
+      msg.message?.documentWithCaptionMessage?.message?.documentMessage?.contextInfo;
+
+    let replyLogPart = '';
+    if (contextInfo && contextInfo.quotedMessage) {
+      const quotedSenderJid = contextInfo.participant;
+      const quotedSenderNumber = quotedSenderJid ? quotedSenderJid.split('@')[0] : '';
+      
+      let quotedText = contextInfo.quotedMessage.conversation ||
+        contextInfo.quotedMessage.extendedTextMessage?.text ||
+        contextInfo.quotedMessage.imageMessage?.caption ||
+        contextInfo.quotedMessage.videoMessage?.caption ||
+        contextInfo.quotedMessage.documentMessage?.caption ||
+        '';
+      
+      if (!quotedText) {
+        if (contextInfo.quotedMessage.imageMessage) quotedText = '[Gambar]';
+        else if (contextInfo.quotedMessage.videoMessage) quotedText = '[Video]';
+        else if (contextInfo.quotedMessage.stickerMessage) quotedText = '[Stiker]';
+        else if (contextInfo.quotedMessage.documentMessage) quotedText = '[Dokumen]';
+        else if (contextInfo.quotedMessage.audioMessage) quotedText = '[Audio]';
+        else quotedText = '[Media/Pesan]';
+      }
+      
+      const maxLen = 30;
+      const truncatedQuoted = quotedText.length > maxLen ? quotedText.slice(0, maxLen) + '...' : quotedText;
+      replyLogPart = ` <Membalas @${quotedSenderNumber}: "${truncatedQuoted}">`;
+    }
+
     const sticker = msg.message?.stickerMessage;
     const isGroup = jid.endsWith('@g.us');
     const groupNames = getCachedGroupNames();
@@ -257,7 +291,7 @@ export async function handleIncomingMessage(sock, msg) {
       if (!isGroup) {
         // Jika DM, selalu balas
         shouldReply = true;
-        console.log(`[Pesan Pribadi dari ${senderName}]: ${text}`);
+        console.log(`[Pesan Pribadi dari ${senderName}]: ${text}${replyLogPart}`);
       } else {
         // Jika di grup, cek apakah bot dimention atau direply
         // Normalisasi perbandingan JID untuk reply/mention agar bebas dari device ID (conflict :1, :2 dll)
@@ -282,7 +316,7 @@ export async function handleIncomingMessage(sock, msg) {
           hasNameMention;
 
         const groupLabel = groupName ? `${groupName} (${jid})` : jid;
-        console.log(`[Pesan Grup dari ${senderName} di ${groupLabel}] (Mentioned: ${isMentioned}): ${text}`);
+        console.log(`[Pesan Grup dari ${senderName} di ${groupLabel}] (Mentioned: ${isMentioned}): ${text}${replyLogPart}`);
 
         if (isMentioned) {
           shouldReply = true;

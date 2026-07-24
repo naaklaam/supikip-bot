@@ -176,7 +176,6 @@ export async function getOpenRouterResponse(jid, sock, msg) {
           } catch (e) {
             console.error(`Gagal parsing argumen untuk tool ${name}:`, e.message);
           }
-          console.log(`[OpenRouter Tool Call] Menjalankan tool: "${name}" dengan parameter:`, JSON.stringify(args));
 
           // Normalisasi argumen untuk keunikan deteksi loop (urutkan kunci JSON)
           const sortedArgsStr = JSON.stringify(args, Object.keys(args).sort());
