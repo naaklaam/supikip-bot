@@ -92,18 +92,25 @@ export async function execute(args, sock, extraContext = {}) {
 
   // 3. Process sending/forwarding to all resolved groups
   for (const target of resolvedTargets) {
+    // Proteksi Loop: Cek apakah target JID ini sudah dikirimi pesan/forward pada turn saat ini
+    if (extraContext.sentTargets && extraContext.sentTargets.has(target.jid)) {
+      console.log(`[Forwarder Skill] Skip mengirim ke ${target.name} (${target.jid}) karena sudah pernah dikirim di turn ini.`);
+      successReports.push(`${target.name} (${target.jid}) [sudah dikirim sebelumnya]`);
+      continue;
+    }
+
     try {
       if (quotedMsg) {
         // Forward the quoted message
         await sock.sendMessage(target.jid, { forward: quotedMsg });
-        
-        // If there's follow-up commentary text, send it right after
-        if (text_content && text_content.trim().length > 0) {
-          await sock.sendMessage(target.jid, { text: text_content });
-        }
-      } else {
+      } else if (text_content && text_content.trim().length > 0) {
         // Just send custom text content
         await sock.sendMessage(target.jid, { text: text_content });
+      }
+
+      // Catat target JID sukses terkirim
+      if (extraContext.sentTargets) {
+        extraContext.sentTargets.add(target.jid);
       }
       successReports.push(`${target.name} (${target.jid})`);
     } catch (err) {

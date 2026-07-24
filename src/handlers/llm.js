@@ -84,6 +84,9 @@ export async function getOpenRouterResponse(jid, sock, msg) {
     return 'Waduh! Kunci API OpenRouter belum diatur di file .env nya!';
   }
 
+  // Buat objek konteks pemanggilan tool yang bertahan sepanjang turn obrolan saat ini
+  const toolContext = { jid, msg, sentTargets: new Set() };
+
   const sessionJid = getSessionJid(jid);
   const now = Date.now();
   let chatData = chatHistories.get(sessionJid);
@@ -173,6 +176,7 @@ export async function getOpenRouterResponse(jid, sock, msg) {
           } catch (e) {
             console.error(`Gagal parsing argumen untuk tool ${name}:`, e.message);
           }
+          console.log(`[OpenRouter Tool Call] Menjalankan tool: "${name}" dengan parameter:`, JSON.stringify(args));
 
           // Normalisasi argumen untuk keunikan deteksi loop (urutkan kunci JSON)
           const sortedArgsStr = JSON.stringify(args, Object.keys(args).sort());
@@ -184,7 +188,7 @@ export async function getOpenRouterResponse(jid, sock, msg) {
             toolOutput = `Error: Tool "${name}" dengan parameter tersebut sudah pernah dieksekusi di iterasi sebelumnya pada turn ini. Silakan gunakan hasil yang sudah diperoleh di atas untuk menyusun jawaban akhir Anda. Jangan memanggil tool ini lagi dengan parameter yang sama.`;
           } else {
             executedToolCalls.add(toolCallKey);
-            toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates, { jid, msg });
+            toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates, toolContext);
             toolOutput = truncateOutput(toolOutput, 3000); // Potong output raksasa agar token input tetap hemat
           }
 
