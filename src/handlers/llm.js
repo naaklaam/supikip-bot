@@ -113,6 +113,7 @@ export async function getOpenRouterResponse(jid, sock, msg) {
   try {
     let maxIterations = 10; // Maksimal 10 iterasi tool call per turn untuk hemat token dan mengurangi latency
     const modelParams = getOpenRouterParamsWithDefaultMaxTokens(1500);
+    const executedToolCalls = new Set();
 
     while (maxIterations-- > 0) {
       const isLastIteration = (maxIterations === 0);
@@ -173,8 +174,19 @@ export async function getOpenRouterResponse(jid, sock, msg) {
             console.error(`Gagal parsing argumen untuk tool ${name}:`, e.message);
           }
 
-          let toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates, { jid, msg });
-          toolOutput = truncateOutput(toolOutput, 3000); // Potong output raksasa agar token input tetap hemat
+          // Normalisasi argumen untuk keunikan deteksi loop (urutkan kunci JSON)
+          const sortedArgsStr = JSON.stringify(args, Object.keys(args).sort());
+          const toolCallKey = `${name}:${sortedArgsStr}`;
+
+          let toolOutput;
+          if (executedToolCalls.has(toolCallKey)) {
+            console.warn(`[LLM Loop Protection] Menolak eksekusi ulang tool yang sama dalam satu turn: ${toolCallKey}`);
+            toolOutput = `Error: Tool "${name}" dengan parameter tersebut sudah pernah dieksekusi di iterasi sebelumnya pada turn ini. Silakan gunakan hasil yang sudah diperoleh di atas untuk menyusun jawaban akhir Anda. Jangan memanggil tool ini lagi dengan parameter yang sama.`;
+          } else {
+            executedToolCalls.add(toolCallKey);
+            toolOutput = await executeTool(name, args, sock, checkShinigamiUpdates, { jid, msg });
+            toolOutput = truncateOutput(toolOutput, 3000); // Potong output raksasa agar token input tetap hemat
+          }
 
           currentMessages.push({
             role: 'tool',
