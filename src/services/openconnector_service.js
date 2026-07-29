@@ -11,7 +11,7 @@ const OC_CONNECTION_NAME = process.env.OC_CONNECTION_NAME || 'default';
  * @param {object} input - Argumen input untuk aksi
  * @returns {Promise<any>}
  */
-export async function executeOpenConnectorAction(actionId, input = {}) {
+export async function executeOpenConnectorAction(actionId, input = {}, connectionName = null) {
   const url = `${OC_URL.replace(/\/$/, '')}/v1/actions/${actionId}`;
   const headers = {
     'Content-Type': 'application/json',
@@ -23,7 +23,7 @@ export async function executeOpenConnectorAction(actionId, input = {}) {
   
   const body = {
     input,
-    connectionName: OC_CONNECTION_NAME,
+    connectionName: connectionName || OC_CONNECTION_NAME,
   };
   
   const response = await fetch(url, {
