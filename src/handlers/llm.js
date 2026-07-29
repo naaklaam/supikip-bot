@@ -5,7 +5,8 @@ import { getRelevantMemoryContext } from '../db/index.js';
 import { checkShinigamiUpdates, resolvedShinigamiDomains } from '../services/shinigami_scraper.js';
 import { getOpenRouterModelName, getOpenRouterParamsWithDefaultMaxTokens } from '../services/model_params.js';
 
-import { getSessionJid } from '../utils/session_helper.js';
+import { getSessionJid, getManhwaGroupJids } from '../utils/session_helper.js';
+import { getCachedGroupNames } from '../utils/group_resolver.js';
 
 // Memori percakapan sementara untuk menyimpan riwayat obrolan (maksimal 10 pesan per JID)
 // Struktur: { messages: [], lastAccessed: timestamp }
@@ -103,6 +104,26 @@ export async function getOpenRouterResponse(jid, sock, msg) {
   const ftsMemoryContext = await getRelevantMemoryContext(lastUserMsg, sessionJid);
 
   let finalSystemInstruction = getSystemInstruction();
+
+  // Tambahkan petunjuk konteks grup manhwa multi-sesi secara eksplisit ke LLM
+  const manhwaJids = getManhwaGroupJids();
+  if (manhwaJids.includes(jid)) {
+    const groupNames = getCachedGroupNames();
+    const currentGroupName = groupNames[jid] || jid;
+    
+    // Dapatkan nama grup mitra/tetangga
+    const otherGroupNames = manhwaJids
+      .filter(j => j !== jid)
+      .map(j => groupNames[j])
+      .filter(Boolean);
+
+    finalSystemInstruction += `\n\n=== INFORMASI GRUP MULTI-SESI ===\n` +
+      `- Anda saat ini sedang aktif merespons di grup: "${currentGroupName}" (${jid}).\n` +
+      `- Daftar grup manhwa mitra lainnya yang terhubung: ${otherGroupNames.map(n => `"${n}"`).join(', ')}.\n` +
+      `- Batasan Memori: Memori obrolan Anda saat ini terisolasi hanya untuk grup "${currentGroupName}". Anda tidak dapat melihat obrolan grup mitra secara langsung.\n` +
+      `- Aksi "Grup Sebelah": Jika pengguna menanyakan tentang obrolan, status, atau apa yang dibahas di "grup sebelah", "grup tetangga", atau grup mitra lainnya, Anda harus memanggil tool "read_chat_history" secara eksplisit dengan mencantumkan nama grup mitra yang dimaksud (contoh: ${otherGroupNames.length > 0 ? `"${otherGroupNames[0]}"` : 'nama grup'}). Jangan berasumsi atau menebak isi obrolan grup sebelah tanpa memanggil tool tersebut.\n`;
+  }
+
   if (ftsMemoryContext) {
     finalSystemInstruction += ftsMemoryContext;
   }

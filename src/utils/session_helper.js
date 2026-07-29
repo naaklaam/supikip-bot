@@ -37,9 +37,5 @@ export function getManhwaGroupJids() {
  * @returns {string}
  */
 export function getSessionJid(jid) {
-  const manhwaJids = getManhwaGroupJids();
-  if (manhwaJids.includes(jid)) {
-    return 'shared_manhwa_groups';
-  }
   return jid;
 }
