@@ -48,6 +48,9 @@ export async function execute(args, sock, extraContext = {}) {
       // Ambil detail ringkas (sender, subjek, tanggal) secara paralel untuk efisiensi
       const detailedList = await Promise.all(
         messages.map(async (msgInfo) => {
+          if (msgInfo.from && msgInfo.subject) {
+            return msgInfo;
+          }
           try {
             const detail = await getGmailMessageDetails(msgInfo.id);
             return {

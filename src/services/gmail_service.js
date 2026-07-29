@@ -11,7 +11,14 @@ export async function listGmailMessages(query = 'is:inbox', maxResults = 10) {
     maxResults,
     detail: 'summary'
   });
-  return data.messages || [];
+  
+  return (data.messages || []).map(m => ({
+    id: m.messageId,
+    threadId: m.threadId,
+    from: m.sender || '',
+    subject: m.subject || '',
+    date: m.messageTimestamp || ''
+  }));
 }
 
 /**
