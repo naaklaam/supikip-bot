@@ -18,8 +18,7 @@ export async function execute(args, sock, extraContext = {}) {
 
   const senderJid = msg.key.participant || msg.key.remoteJid;
   const senderNumber = senderJid.split('@')[0];
-  const ownerNumber = process.env.OWNER_NUMBER;
-  const isOwner = (senderNumber === ownerNumber) || (msg.pushName === 'JO');
+  const isOwner = !!(ownerNumber && senderNumber === ownerNumber);
 
   if (!isOwner) {
     console.warn(`[Google Drive Skill] Akses ditolak untuk JID: ${senderJid} (bukan owner).`);

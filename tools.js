@@ -42,7 +42,10 @@ const OWNER_ONLY_TOOL_NAMES = new Set([
   'write_workspace_file',
   'apply_patch',
   'add_cron_schedule',
-  'remove_cron_schedule'
+  'remove_cron_schedule',
+  'read_workspace_file',
+  'send_workspace_file',
+  'parse_pdf_file'
 ]);
 
 /**
@@ -63,19 +66,27 @@ function normalizeJidNumber(jid) {
 
 /**
  * Mengecek apakah konteks pesan berasal dari Owner (JO).
- * Owner diakui melalui OWNER_NUMBER di .env atau nama pengirim "JO".
+ * Owner diakui melalui OWNER_NUMBER di .env.
  */
 function isOwnerContext(extraContext = {}) {
   const msg = extraContext.msg;
   const senderJid = getSenderJidFromMessage(msg) || extraContext.jid || '';
   const senderNumber = normalizeJidNumber(senderJid);
-  const senderName = msg?.pushName || '';
   const ownerNumber = normalizeJidNumber(process.env.OWNER_NUMBER);
 
-  if (senderName === 'JO') return true;
-  if (ownerNumber && senderNumber === ownerNumber) return true;
+  return !!(ownerNumber && senderNumber === ownerNumber);
+}
 
-  return false;
+/**
+ * Mendapatkan path absolut aman di dalam workspace root.
+ * Mencegah Directory Traversal.
+ */
+function getSafeWorkspacePath(filename) {
+  const resolvedPath = path.resolve(process.cwd(), filename);
+  if (!resolvedPath.startsWith(process.cwd())) {
+    throw new Error('Akses ditolak: File di luar direktori workspace.');
+  }
+  return resolvedPath;
 }
 
 /**
@@ -747,9 +758,9 @@ async function webFetch(url) {
  * Implementasi Tool 5: Membaca berkas workspace
  */
 function readWorkspaceFile(filename) {
-  const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
-  console.log(`[Tool: read_workspace_file] Membaca: ${safePath}`);
   try {
+    const safePath = getSafeWorkspacePath(filename);
+    console.log(`[Tool: read_workspace_file] Membaca: ${safePath}`);
     if (!fs.existsSync(safePath)) return `File tidak ditemukan: ${filename}`;
     const content = fs.readFileSync(safePath, 'utf-8');
     return `Isi berkas "${filename}":\n\n${content}`;
@@ -762,9 +773,9 @@ function readWorkspaceFile(filename) {
  * Implementasi Tool 6: Menulis/Memperbarui berkas workspace
  */
 function writeWorkspaceFile(filename, content) {
-  const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
-  console.log(`[Tool: write_workspace_file] Menulis ke: ${safePath}`);
   try {
+    const safePath = getSafeWorkspacePath(filename);
+    console.log(`[Tool: write_workspace_file] Menulis ke: ${safePath}`);
     atomicWriteFileSync(safePath, content);
     return `Berhasil menulis konten ke berkas "${filename}".`;
   } catch (e) {
@@ -855,9 +866,9 @@ function setOneShotReminder(durationSeconds, message, sock) {
  * Implementasi Tool 11: Apply Patch / Modifikasi Berkas Presisi
  */
 function applyPatch(filename, targetContent, replacementContent) {
-  const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
-  console.log(`[Tool: apply_patch] Modifikasi file: ${safePath}`);
   try {
+    const safePath = getSafeWorkspacePath(filename);
+    console.log(`[Tool: apply_patch] Modifikasi file: ${safePath}`);
     if (!fs.existsSync(safePath)) return `File tidak ditemukan: ${filename}`;
     const originalContent = fs.readFileSync(safePath, 'utf-8');
 
@@ -877,9 +888,9 @@ function applyPatch(filename, targetContent, replacementContent) {
  * Implementasi Tool 12: Membaca teks dokumen PDF lokal
  */
 async function parsePdfFile(filename) {
-  const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
-  console.log(`[Tool: parse_pdf_file] Mengekstrak PDF: ${safePath}`);
   try {
+    const safePath = getSafeWorkspacePath(filename);
+    console.log(`[Tool: parse_pdf_file] Mengekstrak PDF: ${safePath}`);
     if (!fs.existsSync(safePath)) return `File PDF tidak ditemukan: ${filename}`;
     const dataBuffer = fs.readFileSync(safePath);
     const data = await pdf(dataBuffer);
@@ -898,9 +909,9 @@ async function parsePdfFile(filename) {
  * Implementasi Tool 13: Menganalisis gambar menggunakan Gemini multimodal via OpenRouter
  */
 async function analyzeImage(filename, prompt) {
-  const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
-  console.log(`[Tool: analyze_image] Menganalisis gambar: ${safePath}`);
   try {
+    const safePath = getSafeWorkspacePath(filename);
+    console.log(`[Tool: analyze_image] Menganalisis gambar: ${safePath}`);
     if (!fs.existsSync(safePath)) return `File gambar tidak ditemukan: ${filename}`;
 
     const fileBuffer = fs.readFileSync(safePath);
@@ -1072,9 +1083,9 @@ async function runPerformanceTest() {
  * Implementasi Tool 16: Mengirim berkas dokumen/file ke obrolan WhatsApp
  */
 async function sendWorkspaceFile(filename, caption, sock, extraContext = {}) {
-  const safePath = path.join(process.cwd(), filename.replace(/\.\.\//g, ''));
-  console.log(`[Tool: send_workspace_file] Mengirim file: ${safePath}`);
   try {
+    const safePath = getSafeWorkspacePath(filename);
+    console.log(`[Tool: send_workspace_file] Mengirim file: ${safePath}`);
     if (!fs.existsSync(safePath)) return `Berkas tidak ditemukan: ${filename}`;
 
     const { jid, msg } = extraContext;
