@@ -82,6 +82,7 @@ export async function handleIncomingMessage(sock, msg) {
     const senderJid = msg.key.participant || msg.key.remoteJid;
     const senderNumber = senderJid.split('@')[0];
     const senderName = msg.pushName || senderNumber;
+    const ownerNumber = process.env.OWNER_NUMBER;
     const isOwner = !!(ownerNumber && senderNumber === ownerNumber);
 
     /*
@@ -138,6 +139,7 @@ export async function handleIncomingMessage(sock, msg) {
 
       // Static Router: Pengujian performa bot ("speaki dev test") khusus nomor owner
       if (lowercaseText === 'speaki dev test') {
+        const ownerNumber = process.env.OWNER_NUMBER;
         const isOwner = !!(ownerNumber && senderNumber === ownerNumber);
         if (!isOwner) {
           console.warn(`[Security Alert] Akses pengujian performa ditolak untuk: ${senderName} (${senderNumber})`);
