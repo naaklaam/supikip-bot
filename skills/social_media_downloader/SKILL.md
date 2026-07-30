@@ -7,7 +7,7 @@ Skill untuk mengunduh media dari platform sosial media (YouTube, TikTok, Instagr
   "type": "function",
   "function": {
     "name": "download_social_media",
-    "description": "Mengunduh media (video/audio) dari platform media sosial (YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit, Pinterest, dll) menggunakan yt-dlp. Hasil disimpan otomatis di ~/Downloads/SocialMedia/[Platform].",
+    "description": "Mengunduh media (video/audio/foto) dari platform media sosial (YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit, Pinterest, dll) menggunakan yt-dlp dan gallery-dl. Hasil disimpan otomatis di ~/Downloads/SocialMedia/[Platform].",
     "parameters": {
       "type": "object",
       "properties": {
@@ -21,8 +21,8 @@ Skill untuk mengunduh media dari platform sosial media (YouTube, TikTok, Instagr
         },
         "media_type": {
           "type": "string",
-          "enum": ["video", "audio"],
-          "description": "Tipe media: 'video' (default) atau 'audio' (ekstrak mp3)."
+          "enum": ["video", "audio", "image", "all"],
+          "description": "Tipe media: 'video' (default), 'audio' (ekstrak mp3), 'image' (unduh foto/gambar menggunakan gallery-dl), atau 'all' (unduh foto dan video sekaligus)."
         }
       },
       "required": ["url"]

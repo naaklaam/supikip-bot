@@ -83,6 +83,23 @@ function detectPlatform(urlStr, overridePlatform) {
 }
 
 /**
+ * Membaca isi folder secara rekursif untuk mencari berkas.
+ */
+function getFilesRecursively(dir, filesList = []) {
+  if (!fs.existsSync(dir)) return filesList;
+  const files = fs.readdirSync(dir);
+  for (const file of files) {
+    const name = path.join(dir, file);
+    if (fs.statSync(name).isDirectory()) {
+      getFilesRecursively(name, filesList);
+    } else {
+      filesList.push(name);
+    }
+  }
+  return filesList;
+}
+
+/**
  * Titik masuk eksekusi utama yang dipanggil oleh dynamic loader di tools.js
  * @param {object} args - Parameter tool dari LLM
  * @param {object} sock - Socket Baileys WhatsApp
@@ -97,115 +114,241 @@ export async function execute(args, sock, extraContext = {}) {
   const { jid, msg } = extraContext;
   const platform = detectPlatform(url, args.platform);
   const isAudio = args.media_type === 'audio';
-  const ytDlpBin = findYtDlpBinary();
+  const isVideoOnly = args.media_type === 'video';
+  const isImageOnly = args.media_type === 'image';
+  const isAll = args.media_type === 'all' || !args.media_type;
 
-  // Folder tujuan: ~/Downloads/SocialMedia/[Platform]
+  // Folder tujuan utama: ~/Downloads/SocialMedia/[Platform]
   const baseDir = path.join(os.homedir(), 'Downloads', 'SocialMedia');
   const targetDir = path.join(baseDir, platform);
+
+  // Folder sementara terisolasi untuk mendeteksi berkas baru yang diunduh
+  const runDir = path.join(targetDir, `tmp_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+  const cookiesFile = findCookiesFile();
 
   try {
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
-
-    const commandArgs = [
-      '--ignore-config',
-      '--no-warnings',
-      '--no-mtime',
-      '-P', targetDir,
-      '-o', '%(title).150s (%(id)s).%(ext)s'
-    ];
-
-    // Otomatis suntikkan cookies.txt jika ditemukan di ~/Downloads atau workspace
-    const cookiesFile = findCookiesFile();
-    if (cookiesFile) {
-      commandArgs.push('--cookies', cookiesFile);
-      console.log(`[Skill: social_media_downloader] Menggunakan cookies autentikasi dari: ${cookiesFile}`);
+    if (!fs.existsSync(runDir)) {
+      fs.mkdirSync(runDir, { recursive: true });
     }
 
-    if (isAudio) {
-      commandArgs.push('-x', '--audio-format', 'mp3');
+    // Penentuan tool downloader yang akan dijalankan
+    let runYtDlp = false;
+    let runGalleryDl = false;
+
+    if (isAudio || isVideoOnly) {
+      runYtDlp = true;
+    } else if (isImageOnly) {
+      runGalleryDl = true;
+    } else {
+      // Tipe 'all' / default (otomatis mendeteksi platform)
+      if (platform === 'YouTube' || platform === 'TikTok' || platform === 'Facebook' || platform === 'Bilibili') {
+        runYtDlp = true;
+      } else if (platform === 'Pinterest') {
+        runGalleryDl = true;
+      } else {
+        // Platform umum / multi-konten (Instagram, Twitter, Reddit, Threads, General)
+        runYtDlp = true;
+        runGalleryDl = true;
+      }
     }
 
-    commandArgs.push(url);
+    // Helper eksekusi yt-dlp
+    const executeYtDlp = async () => {
+      const ytDlpBin = findYtDlpBinary();
+      const commandArgs = [
+        '--ignore-config',
+        '--no-warnings',
+        '--no-mtime',
+        '-P', runDir,
+        '-o', '%(title).150s (%(id)s).%(ext)s'
+      ];
+      if (cookiesFile) {
+        commandArgs.push('--cookies', cookiesFile);
+      }
+      if (isAudio) {
+        commandArgs.push('-x', '--audio-format', 'mp3');
+      }
+      commandArgs.push(url);
 
-    console.log(`[Skill: social_media_downloader] Mengeksekusi: ${ytDlpBin} ${commandArgs.join(' ')}`);
+      console.log(`[Skill: social_media_downloader] Menjalankan yt-dlp: ${ytDlpBin} ${commandArgs.join(' ')}`);
+      try {
+        await execFileAsync(ytDlpBin, commandArgs, { timeout: 180000 });
+        return true;
+      } catch (err) {
+        console.warn(`[Skill: social_media_downloader] yt-dlp gagal: ${err.message}`);
+        return false;
+      }
+    };
 
-    const { stdout } = await execFileAsync(ytDlpBin, commandArgs, {
-      timeout: 180000 // Timeout 3 menit
-    });
+    // Helper eksekusi gallery-dl
+    const executeGalleryDl = async () => {
+      const galleryDlBin = path.join(process.cwd(), 'gallery-dl.bin');
+      const commandArgs = [
+        '--config-ignore',
+        '-D', runDir
+      ];
+      if (cookiesFile) {
+        commandArgs.push('-C', cookiesFile);
+      }
+      commandArgs.push(url);
 
-    // Cari lokasi berkas hasil unduhan
-    const mergerMatch = stdout.match(/\[Merger\] Merging formats into "(.+)"/);
-    const destinationMatch = stdout.match(/\[download\] Destination: (.+)/) || stdout.match(/\[ExtractAudio\] Destination: (.+)/);
+      console.log(`[Skill: social_media_downloader] Menjalankan gallery-dl: ${galleryDlBin} ${commandArgs.join(' ')}`);
+      try {
+        await execFileAsync(galleryDlBin, commandArgs, { timeout: 180000 });
+        return true;
+      } catch (err) {
+        console.warn(`[Skill: social_media_downloader] gallery-dl gagal: ${err.message}`);
+        return false;
+      }
+    };
 
-    let downloadedFilePath = null;
-    let downloadedFile = 'Media';
-
-    if (mergerMatch) {
-      downloadedFilePath = mergerMatch[1].trim();
-      downloadedFile = path.basename(downloadedFilePath);
-    } else if (destinationMatch) {
-      downloadedFilePath = destinationMatch[1].trim();
-      downloadedFile = path.basename(downloadedFilePath);
+    // Jalankan eksekusi berdasarkan routing
+    if (runGalleryDl && !runYtDlp && isAll) {
+      // Jalankan gallery-dl dahulu
+      await executeGalleryDl();
+      // Jika kosong (kemungkinan link berisi video untuk platform yang sama seperti Pinterest)
+      const currentFiles = getFilesRecursively(runDir);
+      if (currentFiles.length === 0) {
+        console.log(`[Skill: social_media_downloader] gallery-dl tidak menghasilkan file, mencoba fallback ke yt-dlp...`);
+        await executeYtDlp();
+      }
+    } else {
+      // Jalankan paralel atau salah satu sesuai set
+      const downloadTasks = [];
+      if (runYtDlp) downloadTasks.push(executeYtDlp());
+      if (runGalleryDl) downloadTasks.push(executeGalleryDl());
+      await Promise.allSettled(downloadTasks);
     }
 
-    // Jika path parsial, gabungkan dengan targetDir
-    if (downloadedFilePath && !path.isAbsolute(downloadedFilePath)) {
-      downloadedFilePath = path.join(targetDir, downloadedFilePath);
+    // Pindai folder sementara untuk memproses berkas terunduh
+    const downloadedFiles = getFilesRecursively(runDir);
+    if (downloadedFiles.length === 0) {
+      throw new Error('Tidak ada media yang berhasil diunduh oleh yt-dlp maupun gallery-dl.');
     }
 
-    // Kirim berkas media langsung ke chat WhatsApp (diquote ke pesan pengirim)
-    let waSendStatus = '';
-    if (sock && jid && downloadedFilePath && fs.existsSync(downloadedFilePath)) {
-      const stats = fs.statSync(downloadedFilePath);
+    const sendOptions = msg ? { quoted: msg } : {};
+    const successSent = [];
+    const failedOrSkipped = [];
+    let sentCount = 0;
+
+    for (const filePath of downloadedFiles) {
+      const fileName = path.basename(filePath);
+      const ext = path.extname(fileName).toLowerCase();
+
+      // Batasi maksimal 15 file ke WhatsApp
+      if (sentCount >= 15) {
+        failedOrSkipped.push(`${fileName} (dilewati karena limit 15 file)`);
+        continue;
+      }
+
+      const stats = fs.statSync(filePath);
       const sizeMB = stats.size / (1024 * 1024);
-      const sendOptions = msg ? { quoted: msg } : {};
 
       if (sizeMB > 100) {
-        waSendStatus = `\n⚠️ *Ukuran file (${sizeMB.toFixed(1)}MB) melebihi batas 100MB WhatsApp.* File tetap tersimpan di server.`;
-      } else {
-        try {
-          if (isAudio || downloadedFilePath.endsWith('.mp3') || downloadedFilePath.endsWith('.m4a')) {
-            await sock.sendMessage(jid, {
-              audio: { url: downloadedFilePath },
-              mimetype: 'audio/mp4',
-              ptt: false
-            }, sendOptions);
-          } else {
-            // Coba kirim sebagai video
-            try {
-              await sock.sendMessage(jid, {
-                video: { url: downloadedFilePath },
-                caption: `🎥 *${downloadedFile}*\n🌐 *Platform:* ${platform}`
-              }, sendOptions);
-            } catch (vidErr) {
-              console.warn(`[Skill: social_media_downloader] Fallback ke document: ${vidErr.message}`);
-              await sock.sendMessage(jid, {
-                document: { url: downloadedFilePath },
-                mimetype: 'video/mp4',
-                fileName: downloadedFile,
-                caption: `🎥 *${downloadedFile}*\n🌐 *Platform:* ${platform}`
-              }, sendOptions);
-            }
-          }
-          waSendStatus = `\n📤 *Media berhasil terkirim ke obrolan (Quoted Reply).*`;
-        } catch (sendErr) {
-          console.error(`[Skill: social_media_downloader] Gagal kirim WA: ${sendErr.message}`);
-          waSendStatus = `\n⚠️ *Gagal mengirim media ke WA:* ${sendErr.message}`;
-        }
+        failedOrSkipped.push(`${fileName} (karena ukuran ${sizeMB.toFixed(1)}MB > 100MB)`);
+        continue;
       }
+
+      try {
+        if (ext === '.mp3' || ext === '.m4a' || ext === '.wav' || ext === '.ogg') {
+          await sock.sendMessage(jid, {
+            audio: { url: filePath },
+            mimetype: 'audio/mp4',
+            ptt: false
+          }, sendOptions);
+        } else if (ext === '.mp4' || ext === '.mkv' || ext === '.webm' || ext === '.avi' || ext === '.mov') {
+          try {
+            await sock.sendMessage(jid, {
+              video: { url: filePath },
+              caption: `🎥 *${fileName}*\n🌐 *Platform:* ${platform}`
+            }, sendOptions);
+          } catch (vidErr) {
+            console.warn(`[Skill: social_media_downloader] Fallback ke berkas document untuk video: ${vidErr.message}`);
+            await sock.sendMessage(jid, {
+              document: { url: filePath },
+              mimetype: 'video/mp4',
+              fileName: fileName,
+              caption: `🎥 *${fileName}*\n🌐 *Platform:* ${platform}`
+            }, sendOptions);
+          }
+        } else if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.webp' || ext === '.gif') {
+          await sock.sendMessage(jid, {
+            image: { url: filePath },
+            caption: `📸 *${fileName}*\n🌐 *Platform:* ${platform}`
+          }, sendOptions);
+        } else {
+          // Jenis file lainnya kirim sebagai document biasa
+          await sock.sendMessage(jid, {
+            document: { url: filePath },
+            fileName: fileName,
+            caption: `📄 *${fileName}*\n🌐 *Platform:* ${platform}`
+          }, sendOptions);
+        }
+
+        successSent.push(fileName);
+        sentCount++;
+      } catch (sendErr) {
+        console.error(`[Skill: social_media_downloader] Gagal kirim WA (${fileName}):`, sendErr.message);
+        failedOrSkipped.push(`${fileName} (eror kirim: ${sendErr.message})`);
+      }
+    }
+
+    // Pindahkan semua berkas hasil unduhan ke direktori utama (SocialMedia/[Platform])
+    for (const filePath of downloadedFiles) {
+      try {
+        const destPath = path.join(targetDir, path.basename(filePath));
+        let finalDest = destPath;
+        let counter = 1;
+        // Penanganan tabrakan nama file
+        while (fs.existsSync(finalDest)) {
+          const fileExt = path.extname(filePath);
+          const baseName = path.basename(filePath, fileExt);
+          finalDest = path.join(targetDir, `${baseName}_${counter}${fileExt}`);
+          counter++;
+        }
+        fs.renameSync(filePath, finalDest);
+      } catch (moveErr) {
+        console.error(`[Skill: social_media_downloader] Gagal memindahkan ${filePath}:`, moveErr.message);
+      }
+    }
+
+    // Hapus folder sementara
+    try {
+      fs.rmSync(runDir, { recursive: true, force: true });
+    } catch (rmErr) {
+      console.error(`[Skill: social_media_downloader] Gagal membersihkan folder tmp:`, rmErr.message);
+    }
+
+    // Susun status hasil pengiriman WA
+    let waSendStatus = '';
+    if (successSent.length > 0) {
+      waSendStatus += `\n📤 *Terkirim ke WhatsApp:* ${successSent.length} file.`;
+    }
+    if (failedOrSkipped.length > 0) {
+      waSendStatus += `\n⚠️ *Tidak terkirim/Dilewati:* \n- ${failedOrSkipped.join('\n- ')}`;
     }
 
     return `✅ *BERHASIL MENGUNDUH MEDIA*\n\n` +
       `🌐 *Platform:* ${platform}\n` +
       `📁 *Lokasi Server:* ${targetDir}\n` +
-      `📄 *File:* ${downloadedFile}\n` +
+      `📄 *Total File Terunduh:* ${downloadedFiles.length} file\n` +
       `🔗 *URL:* ${url}` +
       (cookiesFile ? `\n🔑 *Cookies:* Active (${path.basename(cookiesFile)})` : '') +
       waSendStatus;
 
   } catch (error) {
+    // Pastikan folder sementara dibersihkan jika terjadi eror
+    try {
+      if (fs.existsSync(runDir)) {
+        fs.rmSync(runDir, { recursive: true, force: true });
+      }
+    } catch (rmErr) {
+      // ignore
+    }
+
     console.error(`[Skill: social_media_downloader] Error: ${error.message}`);
     return `❌ *GAGAL MENGUNDUH MEDIA*\n\n` +
       `🌐 *Platform:* ${platform}\n` +
