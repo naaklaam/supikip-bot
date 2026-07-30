@@ -1,239 +1,82 @@
-# 📖 Panduan Menjalankan Bot WhatsApp Speaki Standalone
+# Panduan Bot WhatsApp Speaki Standalone
 
-Panduan ini membantu Anda menyiapkan, mengonfigurasi, dan menjalankan bot WhatsApp **Speaki** yang super cepat dan responsif secara terpisah dari framework OpenClaw, namun tetap menggunakan modul WhatsApp [baileys](file://./baileys).
-
----
-
-## 🛠️ Persyaratan Sistem
-* **Node.js**: Versi `20.0.0` atau yang lebih tinggi (Persyaratan wajib dari Baileys v7).
-* **NPM**: Bawaan dari instalasi Node.js Anda.
+Panduan ini menjelaskan cara menyiapkan, mengonfigurasi, dan menjalankan bot WhatsApp Speaki secara mandiri. Bot ini berjalan menggunakan pustaka Baileys secara langsung, tanpa ketergantungan penuh pada framework OpenClaw.
 
 ---
 
-## 📂 Arsitektur Modular & Berkas Prompting Terstruktur
+## Persyaratan Sistem
 
-Semua kode bot telah direstrukturisasi secara modular di bawah direktori `src/`:
-1. **[bot-speaki.js](file://./bot-speaki.js)**: Entrypoint utama aplikasi.
-2. **`src/connection/`**: [start_bot.js](file://./src/connection/start_bot.js) mengelola siklus hidup koneksi WebSocket Baileys, queue pesan masuk, dan auto-reconnect backoff.
-3. **`src/handlers/`**: [message_handler.js](file://./src/handlers/message_handler.js) & [llm.js](file://./src/handlers/llm.js) menangani pemfilteran pesan, panggilan OpenRouter LLM, dan injeksi konteks memori/status.
-4. **`src/services/`**: [cron_scheduler.js](file://./src/services/cron_scheduler.js) (dengan live file watcher), [shinigami_scraper.js](file://./src/services/shinigami_scraper.js) (resolusi domain induk `shinigami.to`), dan [heartbeat.js](file://./src/services/heartbeat.js).
-5. **`src/utils/`**: [atomic_file.js](file://./src/utils/atomic_file.js) menyediakan penulisan file atomik aman (*temporary file + rename*) untuk mencegah korupsi data state.
-6. **[tools.js](file://./tools.js)**: Registry utama tools statis dan loader validator untuk dynamic skills.
-7. **[skills/](file://./skills)**: Folder penyimpanan modul kemampuan (*dynamic skills*) pihak ketiga yang dimuat secara dinamis dengan validasi skema JSON.
-
-### 🧠 Berkas Prompting Terstruktur (Gaya OpenClaw)
-Kepribadian dan perilaku bot ditentukan secara modular melalui file-file markdown berikut yang digabungkan secara dinamis sebagai System Prompt:
-* **[CORE_IDENTITY.md](file://./CORE_IDENTITY.md)**: Inti kepribadian, identitas agen, nada bicara dingin/ketus, batasan perilaku, dan aturan grup/memori yang dikonsolidasi.
-* **[AGENTS.md](file://./AGENTS.md)**: Referensi operasional singkat.
-* **[TOOLS.md](file://./TOOLS.md)**: Catatan lokal lingkungan kerja dan kontak grup.
-* **[HEARTBEAT.md](file://./HEARTBEAT.md)**: Berisi daftar tugas berkala yang dievaluasi LLM saat interval detak jantung berjalan.
-* **[MEMORY.md](file://./MEMORY.md)**: Catatan memori jangka panjang ringkas terstruktur (Wajib berada di bawah 30 baris).
+* **Node.js**: Versi `20.0.0` atau yang lebih tinggi (Kebutuhan wajib Baileys v7).
+* **NPM**: Bawaan dari instalasi Node.js.
 
 ---
 
-## 🚀 Langkah-Langkah Setup & Menjalankan Bot
+## Struktur Repositori
 
-### Langkah 1: Instal Seluruh Dependensi secara Otomatis
-Kita menggunakan NPM untuk menginstal seluruh pustaka yang dibutuhkan secara otomatis. 
+Kode bot diatur secara modular di bawah direktori `src/` untuk menangani siklus hidup koneksi Baileys (`src/connection`), penanganan logika LLM dan pesan (`src/handlers`), serta layanan berkala seperti cron dan scraping (`src/services`).
+
+Kepribadian dan perilaku bot dikonfigurasi melalui berkas markdown terstruktur di bawah root direktori (seperti `CORE_IDENTITY.md`, `AGENTS.md`, `MEMORY.md`, dan `TOOLS.md`) yang digabungkan secara dinamis sebagai instruksi sistem untuk LLM.
+
+---
+
+## Setup dan Cara Menjalankan
+
+### Langkah 1: Instalasi Dependensi
+Jalankan perintah berikut untuk menginstal pustaka yang dibutuhkan:
 ```bash
 cd /path/to/project/Supikip
 npm install --legacy-peer-deps
 ```
 
-### Langkah 2: Konfigurasi API Key OpenRouter
-Buka file **[.env](file://./.env)** di text editor Anda, lalu masukkan kunci API OpenRouter Anda.
+### Langkah 2: Konfigurasi API
+Buka berkas `.env` dan konfigurasikan API Key OpenRouter serta URL/Koneksi OOMOL OpenConnector jika diperlukan.
 
-### Langkah 3: Jalankan Bot
-Jalankan perintah berikut untuk mengaktifkan bot:
+### Langkah 3: Jalankan Aplikasi
+Jalankan bot dengan perintah:
 ```bash
 node bot-speaki.js
 ```
 
-### Langkah 4: Hubungkan ke WhatsApp (Scan QR)
-Pindai (scan) QR Code yang ada di terminal menggunakan fitur **Perangkat Tertaut** di aplikasi WhatsApp HP Anda.
+### Langkah 4: Hubungkan ke WhatsApp
+Pindai (scan) QR Code yang muncul di terminal menggunakan fitur **Perangkat Tertaut** pada aplikasi WhatsApp di ponsel Anda.
 
 ---
 
-## 🛠️ Fitur Tools Statis Bawaan
+## Fitur Utama
 
-Bot dilengkapi dengan tools statis bawaan di **[tools.js](file:///home/naaklaam/Supikip/tools.js)** yang bisa dipanggil oleh LLM secara dinamis:
+### 1. Integrasi OOMOL OpenConnector
+Bot terhubung dengan daemon OpenConnector lokal untuk mendelegasikan integrasi layanan pihak ketiga tanpa perlu menyimpan kredensial mentah di berkas konfigurasi bot:
+* **Gmail:** Membaca, merangkum, mengarsipkan, atau menghapus email masuk.
+* **Google Drive:** Mencari file, membaca properti berkas, dan mengunduh berkas teks.
+* **Google Sheets:** Menulis baris data baru (append) atau membaca/memperbarui sel tertentu.
+* **OpenRouter Tracker:** Memantau sisa limit kredit dan status kunci API OpenRouter aktif.
 
-1. **`web_search`**: Pencarian web pintar bertingkat (Tavily Search API sebagai pencarian utama + ringkasan AI, SerpAPI sebagai cadangan pertama, dan DuckDuckGo Scraper sebagai cadangan kedua).
-2. **`web_fetch`**: Mengambil & membersihkan konten teks dari halaman URL web tertentu.
-3. **`get_system_status`**: Metrik status performa PC/Server (RAM, CPU, Uptime).
-4. **`read_workspace_file` & `write_workspace_file`**: Operasi file I/O lokal di workspace.
-5. **`apply_patch`**: Penerapan modifikasi file terarah (search and replace) hemat token.
-6. **`run_terminal_command`**: (Owner Only) Eksekusi perintah bash/shell.
-7. **`add_cron_schedule` & `remove_cron_schedule`**: Kontrol penugasan cron dinamis.
-8. **`set_one_shot_reminder`**: Pengingat waktu mundur sekali jalan.
-9. **`parse_pdf_file`**: Ekstraksi teks dokumen PDF lokal menggunakan `pdf-parse`.
-10. **`analyze_image`**: Analisis gambar base64 lokal menggunakan penglihatan multimodal Gemini.
-11. **`delegate_subagent`**: Delegasi sub-percakapan terisolasi dengan LLM.
-12. **`run_performance_test`**: (Owner Only via pemicu `"speaki dev test"`) Menguji latensi API OpenRouter dan kecepatan I/O server.
-13. **`send_workspace_file`**: Mengirimkan berkas dokumen/file dari direktori server lokal langsung ke chat WhatsApp.
-14. **`read_chat_history`**: Membaca riwayat pesan terakhir dari grup atau kontak tertentu berdasarkan nama grup (fuzzy matching) atau JID langsung dari database SQLite.
+### 2. Memori Jangka Panjang SQLite FTS5
+Menggunakan SQLite dengan pencarian teks penuh (FTS5) untuk menyimpan dan mencari riwayat obrolan masa lalu secara instan. Sistem secara otomatis menyisipkan memori yang relevan ke dalam prompt LLM secara hemat token.
 
----
+### 3. Pembedah Link (Smart Link Unfurler)
+Mendeteksi tautan berita atau artikel yang dikirim di obrolan dan memberikan ringkasan instan berisi 3 poin utama dalam Bahasa Indonesia.
 
-## 🧩 Sistem Dynamic Skills (Pemuatan Dinamis)
+### 4. Pengolah Dokumen (Document Processor)
+Mampu memproses berbagai dokumen yang dikirim oleh pengguna (seperti `.txt`, `.pdf`, `.docx`, `.xlsx`) untuk dibaca kontennya oleh LLM atau dijadikan basis referensi.
 
-Bot secara otomatis memindai direktori [skills/](file:///home/naaklaam/Supikip/skills) setiap kali dinyalakan.
+### 5. Pemantau Manhwa (Shinigami Scraper)
+Memantau pembaruan judul manhwa di situs Shinigami secara berkala dan mengirimkan pemberitahuannya ke grup target lengkap dengan stiker sampul otomatis.
 
-*   **[bitcoin_market_analyzer](file:///home/naaklaam/Supikip/skills/bitcoin_market_analyzer)**:
-    *   *Fungsi*: `analyze_bitcoin_market`
-    *   *Deskripsi*: Mengambil data pasar real-time spot Bitcoin (harga global, volume perdagangan spot 24 jam, fluktuasi harga terendah/tertinggi) dari API CoinGecko dan Binance Spot untuk bypass proteksi Cloudflare.
-*   **[ocr_extractor](file:///home/naaklaam/Supikip/skills/ocr_extractor)**:
-    *   *Fungsi*: `extract_text_from_image`
-    *   *Deskripsi*: Mengekstrak teks secara akurat dari berkas gambar lokal menggunakan teknologi Gemini Vision API.
-*   **[serpapi_quota_manager](file:///home/naaklaam/Supikip/skills/serpapi_quota_manager)**:
-    *   *Fungsi*: `manage_serpapi_quota`
-    *   *Deskripsi*: Memantau kuota pencarian SerpAPI saat ini atau memperbarui nilai usage secara manual.
-*   **[sticker_responder](file:///home/naaklaam/Supikip/skills/sticker_responder)**:
-    *   *Fungsi*: `send_sticker_response`
-    *   *Deskripsi*: Mengirimkan stiker WhatsApp biner mentah secara acak berdasarkan tag kategori (ekspresi) dari database SQLite lokal.
-*   **[social_media_downloader](file:///home/naaklaam/Supikip/skills/social_media_downloader)**:
-    *   *Fungsi*: `download_social_media`
-    *   *Deskripsi*: Mengunduh media/video/audio dari YouTube, TikTok, Instagram, Twitter/X, Facebook, Reddit, Pinterest, dll. menggunakan `yt-dlp`. Berkas disimpan di `~/Downloads/SocialMedia/[Platform]` dan otomatis dikirimkan kembali ke obrolan WhatsApp peminta sebagai balasan kutipan (*quoted reply*). Otomatis menyuntikkan `cookies.txt` dari `~/Downloads/cookies.txt` untuk media yang membutuhkan autentikasi login (misal Instagram Reels).
-*   **[long_term_memory](file:///home/naaklaam/Supikip/skills/long_term_memory)**:
-    *   *Fungsi*: `search_long_term_memory`
-    *   *Deskripsi*: Pencarian berbasis SQLite FTS5 (Full-Text Search) untuk mengingat pesan obrolan lampau berbulan-bulan lalu atau fakta jangka panjang yang tersimpan di database `speaki.db`.
-*   **[multi_agent_delegator](file:///home/naaklaam/Supikip/skills/multi_agent_delegator)**:
-    *   *Fungsi*: `delegate_parallel_subagents`
-    *   *Deskripsi*: Mendelegasikan beberapa sub-tugas kompleks sekaligus ke beberapa sub-agent terisolasi secara simultan (`Promise.all`) dengan peran/instruksi terpisah.
-*   **[self_learning](file:///home/naaklaam/Supikip/skills/self_learning)**:
-    *   *Fungsi*: `learn_preference`
-    *   *Deskripsi*: Menyimpan aturan baru, koreksi pengguna, atau preferensi khusus yang diajarkan pengguna secara otomatis ke database SQLite FTS5 tanpa membengkakkan file `CORE_IDENTITY.md`.
-*   **[cross_group_forwarder](file:///home/naaklaam/Supikip/skills/cross_group_forwarder)**:
-    *   *Fungsi*: `forward_group_message`
-    *   *Deskripsi*: Meneruskan (forward) pesan yang di-reply (quoted) atau mengirimkan teks baru ke satu atau beberapa grup tujuan dengan nama grup (fuzzy matching) atau JID.
-
-### Cara Menambahkan Skill Baru:
-Buat folder baru di bawah `skills/` (misal: `skills/hello_world/`) yang wajib berisi:
-1. **`SKILL.md`**: File markdown dokumentasi yang di dalamnya terselip blok JSON skema OpenAI Function Calling, contoh:
-   ```markdown
-   # Hello World Skill
-   ```json
-   {
-     "type": "function",
-     "function": {
-       "name": "say_hello",
-       "description": "Mengucapkan halo secara kustom.",
-       "parameters": {
-         "type": "object",
-         "properties": {
-           "name": { "type": "string" }
-         },
-         "required": ["name"]
-       }
-     }
-   }
-   ```
-   ```
-2. **`index.js`**: Kode Javascript modul ES yang mengekspor fungsi `execute`, contoh:
-   ```javascript
-   export async function execute(args, sock) {
-       return `Halo ${args.name}, salam kenal dari sistem modul dinamis!`;
-   }
-   ```
+### 6. Sinkronisasi Chat Lintas Grup (Shared Session)
+Menghubungkan konteks obrolan beberapa grup yang ditentukan di `.env` agar berbagi memori obrolan yang sama, dengan penandaan asal grup yang jelas pada LLM.
 
 ---
 
-## 🧠 Sistem Memori Jangka Panjang SQLite FTS5 (`speaki.db`)
+## Sistem Dynamic Skills
 
-Bot dilengkapi dengan arsitektur pencarian memori jangka panjang berlatensi sub-milidetik menggunakan **SQLite FTS5 (Full-Text Search)**:
-
-*   **Pencatatan Pesan Otomatis**: Setiap pesan masuk dan balasan bot secara otomatis tersimpan dan diindeks di tabel `chat_messages_history` & virtual table FTS5 `messages_fts`.
-*   **Penyimpanan Fakta Jangka Panjang**: Tabel `long_term_memories` & `memories_fts` menyimpan fakta/preferensi jangka panjang.
-*   **Pencarian Relevan Otomatis (Zero Context Waste)**: Saat pengguna mengirim pertanyaan ke bot, sistem FTS5 secara otomatis mencari riwayat/fakta terkait dalam kurun waktu berbulan-bulan lalu dan menyuntikkan fragmen memori yang relevan saja ke prompt LLM.
-*   **Keuntungan Utama**: `MEMORY.md` tetap sangat ringkas (< 30 baris), context window hemat, latensi balasan tetap sub-detik, namun bot dapat mengingat topik pembahasan lampau secara akurat.
+Kemampuan bot dapat diperluas secara dinamis dengan membuat modul folder baru di bawah direktori `skills/`. Setiap folder wajib berisi:
+1. `SKILL.md`: Skema deskripsi parameter fungsi dalam format JSON.
+2. `index.js`: Fungsi eksekusi Javascript (ES module) yang dipanggil saat LLM memicu tool bersangkutan.
 
 ---
 
-## 📰 Smart Link Unfurler Engine (`link_unfurler.js`)
+## Keamanan dan Isu Umum
 
-Bot memiliki modul deteksi & pembedah URL artikel berita/blog otomatis ([link_unfurler.js](file:///home/naaklaam/Supikip/link_unfurler.js)):
-
-*   **Deteksi Otomatis**: Setiap kali tautan artikel/berita (misal: `https://detik.com/...`, `https://medium.com/...`, HackerNews, blog, dll.) dibagikan di obrolan chat/grup, sistem secara otomatis mengekstrak URL tersebut.
-*   **Ringkasan 3 Poin Utama**: Membedah teks artikel dalam latensi cepat (~500ms) dan menghasilkan balasan kutipan berisi judul artikel serta **3 poin utama paling krusial** dalam Bahasa Indonesia.
-*   **Mengabaikan Link Media**: Secara otomatis mengabaikan tautan video/sosmed (Instagram Reels, TikTok, YouTube) agar tidak mengganggu skill downloader media.
-
----
-
-## 📄 Fitur Pengolah Dokumen WhatsApp (`document_processor.js`)
-
-Bot memiliki sistem pengolahan dokumen terintegrasi ([document_processor.js](file:///home/naaklaam/Supikip/document_processor.js)) yang mampu mengunduh, membaca, dan menganalisis berkas dokumen yang dikirimkan pengguna ke obrolan WhatsApp:
-
-*   **Format Berkas yang Didukung**:
-    *   **Teks & Kode**: `.txt`, `.md`, `.json`, `.csv`, `.log`, `.yaml`, `.yml`, `.xml`, `.js`, `.ts`, `.py`, `.html`, `.css`, `.sql`, dll.
-    *   **Spreadsheet / Excel**: `.xlsx`, `.xls`, `.ods` (diekstrak otomatis per-sheet menjadi CSV/tabel terstruktur via `xlsx`).
-    *   **Word Document**: `.docx` (diekstrak otomatis menjadi teks via `mammoth`).
-    *   **PDF Document**: `.pdf` (diekstrak teksnya via `pdf-parse`).
-*   **Alur Pemrosesan**:
-    *   File disimpan otomatis ke folder `./temp_docs/`.
-    *   Konten teks dokumen disuntikkan ke dalam konteks LLM sehingga bot dapat merangkum, mengecek kesalahan (proofread), mengoreksi, atau menjawab pertanyaan spesifik mengenai dokumen tersebut.
-*   **Auto-Sync Cookies**:
-    *   Mengunggah berkas bernama `cookies.txt` di WhatsApp secara otomatis memperbarui `~/Downloads/cookies.txt` dan `./cookies.txt` di server untuk kebutuhan `yt-dlp`.
-*   **Pengiriman Kembali Berkas Terkoreksi**:
-    *   Jika pengguna meminta pembuatan/perbaikan dokumen, LLM menggunakan tool `send_workspace_file` untuk mengirim berkas kembali ke obrolan sebagai balasan kutipan (*quoted document reply*).
-
----
-
-## 📖 Shinigami Manhwa Scraper & Filter (`list-manhwa.md`)
-
-Bot secara otomatis memantau update rilisan Manhwa/Manga secara berkala:
-
-*   **Pemeriksaan Berkala**: Pengecekan dilakukan secara background non-blocking setiap 15 menit (sesuai `MANHWA_CHECK_INTERVAL`).
-*   **Filter Daftar Judul Dipantau**: Hanya seri Manhwa yang judulnya tercantum di file **[list-manhwa.md](file:///home/naaklaam/Supikip/list-manhwa.md)** yang akan dikirimkan pemberitahuannya ke grup WhatsApp.
-*   **Target Grup Dinamis**: Mendukung pengiriman ke beberapa target grup sekaligus menggunakan JID langsung (`MANHWA_GROUP_JID`) atau nama grup asli (`MANHWA_GROUP_NAMES`) yang dipisahkan koma di file `.env`. Nama grup diterjemahkan secara otomatis menggunakan cache grup dari Baileys.
-*   **Konversi Stiker Sampul Otomatis (WebP WhatsApp-Compliant)**: Secara otomatis mengambil cover manhwa, memotong/mengisi dengan rasio 3:4 dengan transparansi menggunakan ImageMagick `convert`, dan mengompresnya menggunakan `cwebp` menjadi file WebP di bawah 100 KB agar terkirim bersih sebagai stiker cover di WhatsApp.
-*   **Pelacakan State**: State chapter terakhir disimpan di `last_manhwa.json` secara atomik per-item setelah pesan sukses terkirim ke WhatsApp untuk keandalan maksimal.
-
----
-
-## 👥 Penyatuan Sesi Obrolan & Memori Bersama Lintas Grup (Multi-Group Orchestration)
-
-Untuk grup-grup manhwa yang terkonfigurasi di `.env` (via JID maupun nama grup), bot menerapkan sistem penyatuan sesi obrolan (LLM chat history) dan pencatatan riwayat SQLite FTS5 di bawah JID virtual `'shared_manhwa_groups'`:
-*   **Berbagi Memori & Konteks**: Semua grup manhwa berbagi riwayat obrolan dan pencarian memori jangka panjang yang sama secara sinkron.
-*   **Pelabelan Sumber Grup**: Untuk mencegah kebingungan obrolan, bot secara otomatis menambahkan label asal grup:
-    *   **LLM Context**: Diformat menjadi `[Nama Pengirim di Nama Grup]` (misal: `[JO di Punini Raven]`).
-    *   **SQLite DB**: Disimpan sebagai `Nama Pengirim (di Nama Grup)` untuk pesan masuk, dan `Speaki ⚙️🤖 (di Nama Grup)` untuk balasan bot.
-*   **Log Systemd Human-Readable**: Semua pengiriman pesan dan logs di journalctl mencetak nama grup asli di samping JID, mempermudah pemantauan (contoh: `Grup Utama (120363407159758205@g.us)`).
-
----
-
-## 📝 Fitur OCR Gambar Masal (Auto-OCR Mode)
-
-Bot memiliki interceptor OCR terintegrasi tanpa token LLM untuk ekstraksi teks super cepat.
-
-*   **Pemicu Sekali Jalan**: Kirim gambar dengan takarir/caption `"ocr"`.
-*   **Auto-OCR Mode (Sangat berguna untuk kirim masal)**:
-    *   Ketik **`ocr on`** di grup/obrolan untuk mengaktifkan mode otomatis. Gambar apa saja yang dikirim berikutnya tanpa caption akan langsung di-OCR oleh bot.
-    *   Bot akan me-reply teks hasil OCR secara spesifik ke masing-masing gambar bersangkutan (sangat rapi untuk pengiriman 10 gambar sekaligus).
-    *   Matikan mode ini jika sudah selesai dengan mengetik **`ocr off`**.
-
----
-
-## 📅 Fitur Jadwal Cron (Cron Tasks)
-Anda dapat menambahkan tugas penjadwalan berkala di file **[schedules.json](file:///home/naaklaam/Supikip/schedules.json)**.
-Contoh entri format JSON:
-```json
-[
-  {
-    "schedule": "0 9 * * *",
-    "description": "Daily status check",
-    "prompt": "Jalankan status PC server dan berikan ringkasan ringkas."
-  }
-]
-```
-
----
-
-## ⚠️ Peringatan Keamanan & Masalah Umum
-
-> [!WARNING]
-> **Risiko Pemblokiran (Banned) Nomor WhatsApp**:
-> WhatsApp memiliki deteksi anti-spam yang ketat. Hindari menggunakan bot ini untuk mengirim pesan massal (spam) atau membalas terlalu banyak pesan grup dalam waktu singkat. Sangat disarankan menggunakan nomor cadangan (SIM Card kedua).
-
-> [!IMPORTANT]
-> **Konflik Balasan Ganda (Double Reply)**:
-> Pastikan Anda telah menonaktifkan channel WhatsApp di OpenClaw Anda dengan mengatur `"channels.whatsapp.enabled": false` pada berkas [openclaw.json](file:///home/naaklaam/.openclaw/openclaw.json).
+* **Risiko Pemblokiran:** WhatsApp mendeteksi aktivitas bot secara ketat. Hindari aktivitas spam atau membalas pesan dalam volume besar sekaligus. Disarankan menggunakan nomor cadangan.
+* **Konflik Balasan (OpenClaw):** Jika Anda menggunakan framework OpenClaw, pastikan channel WhatsApp bawaan di nonaktifkan (`"channels.whatsapp.enabled": false` di `openclaw.json`) agar tidak terjadi balasan ganda.
