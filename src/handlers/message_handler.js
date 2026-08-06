@@ -137,8 +137,8 @@ export async function handleIncomingMessage(sock, msg) {
         return;
       }
 
-      // Static Router: Pengujian performa bot ("speaki dev test") khusus nomor owner
-      if (lowercaseText === 'speaki dev test') {
+      // Static Router: Pengujian performa bot ("speaki dev test" / "spikip dev test") khusus nomor owner
+      if (['speaki dev test', 'spikip dev test', 'supikip dev test', 'spiki dev test'].includes(lowercaseText)) {
         const ownerNumber = process.env.OWNER_NUMBER;
         const isOwner = !!(ownerNumber && senderNumber === ownerNumber);
         if (!isOwner) {
