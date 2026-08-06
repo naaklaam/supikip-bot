@@ -4,11 +4,13 @@
   "type": "module",
   "main": "bot-speaki.js",
   "dependencies": {
-    "@itsliaaa/baileys": "file:./baileys",
+    "@hapi/boom": "^10.0.1",
+    "@itsliaaa/baileys": "^0.3.18-final",
     "dotenv": "^16.4.5",
     "mammoth": "^1.12.0",
     "node-cron": "^4.5.0",
     "pdf-parse": "^2.4.5",
+    "pino": "^9.6.0",
     "qrcode-terminal": "^0.12.0",
     "sqlite3": "^6.0.1",
     "xlsx": "^0.18.5"
