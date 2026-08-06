@@ -28,6 +28,16 @@ export function getManhwaGroupJids() {
     });
   }
 
+  // 3. Fallback ke TARGET_GROUPS jika MANHWA_GROUP_JID / MANHWA_GROUP_NAMES tidak diset
+  if (jids.length === 0 && process.env.TARGET_GROUPS) {
+    process.env.TARGET_GROUPS.split(',')
+      .map(j => j.trim())
+      .filter(Boolean)
+      .forEach(j => {
+        if (!jids.includes(j)) jids.push(j);
+      });
+  }
+
   return jids;
 }
 
