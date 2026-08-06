@@ -82,8 +82,9 @@ export async function handleIncomingMessage(sock, msg) {
     const senderJid = msg.key.participant || msg.key.remoteJid;
     const senderNumber = senderJid.split('@')[0];
     const senderName = msg.pushName || senderNumber;
-    const ownerNumber = process.env.OWNER_NUMBER;
-    const isOwner = !!(ownerNumber && senderNumber === ownerNumber);
+    const ownerConfig = process.env.OWNER_NUMBER || '';
+    const ownerNumbers = ownerConfig.split(',').map(n => n.trim().replace(/\D/g, '')).filter(Boolean);
+    const isOwner = ownerNumbers.includes(senderNumber);
 
     /*
     // Deteksi jika Owner mengirim stiker untuk dijadikan bahan database (DINONAKTIFKAN SEMENTARA)
@@ -139,8 +140,6 @@ export async function handleIncomingMessage(sock, msg) {
 
       // Static Router: Pengujian performa bot ("speaki dev test" / "spikip dev test") khusus nomor owner
       if (['speaki dev test', 'spikip dev test', 'supikip dev test', 'spiki dev test'].includes(lowercaseText)) {
-        const ownerNumber = process.env.OWNER_NUMBER;
-        const isOwner = !!(ownerNumber && senderNumber === ownerNumber);
         if (!isOwner) {
           console.warn(`[Security Alert] Akses pengujian performa ditolak untuk: ${senderName} (${senderNumber})`);
           await sock.sendMessage(jid, { text: 'Akses ditolak. Fitur ini terbatas untuk pengembang.' });

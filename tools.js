@@ -72,9 +72,10 @@ function isOwnerContext(extraContext = {}) {
   const msg = extraContext.msg;
   const senderJid = getSenderJidFromMessage(msg) || extraContext.jid || '';
   const senderNumber = normalizeJidNumber(senderJid);
-  const ownerNumber = normalizeJidNumber(process.env.OWNER_NUMBER);
+  const ownerConfig = process.env.OWNER_NUMBER || '';
+  const ownerNumbers = ownerConfig.split(',').map(n => n.trim().replace(/\D/g, '')).filter(Boolean);
 
-  return !!(ownerNumber && senderNumber === ownerNumber);
+  return ownerNumbers.includes(senderNumber);
 }
 
 /**
