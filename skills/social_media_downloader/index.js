@@ -28,6 +28,27 @@ function findYtDlpBinary() {
 }
 
 /**
+ * Mencari biner gallery-dl yang tersedia di sistem.
+ */
+function findGalleryDlBinary() {
+  const candidatePaths = [
+    '/usr/bin/gallery-dl',
+    '/usr/local/bin/gallery-dl',
+    '/home/linuxbrew/.linuxbrew/bin/gallery-dl',
+    path.join(process.cwd(), 'gallery-dl.bin'),
+    path.join(process.cwd(), 'gallery-dl')
+  ];
+
+  for (const binPath of candidatePaths) {
+    if (fs.existsSync(binPath)) {
+      return binPath;
+    }
+  }
+
+  return 'gallery-dl';
+}
+
+/**
  * Mencari berkas cookies.txt yang tersedia untuk autentikasi (Instagram/Facebook/dll).
  */
 function findCookiesFile() {
@@ -185,7 +206,7 @@ export async function execute(args, sock, extraContext = {}) {
 
     // Helper eksekusi gallery-dl
     const executeGalleryDl = async () => {
-      const galleryDlBin = path.join(process.cwd(), 'gallery-dl.bin');
+      const galleryDlBin = findGalleryDlBinary();
       const commandArgs = [
         '--config-ignore',
         '-D', runDir
