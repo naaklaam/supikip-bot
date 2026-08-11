@@ -11,7 +11,7 @@ const NUMBER_ALIASES = {
 };
 
 const DEFAULTS = {
-  temperature: 0.7,
+  temperature: 0.5,
   top_p: 1,
   max_tokens: undefined,
   presence_penalty: undefined,
@@ -52,7 +52,7 @@ function omitUndefined(object) {
 }
 
 export function getOpenRouterModelName() {
-  return process.env.MODEL_NAME || 'google/gemini-2.5-flash-lite';
+  return process.env.MODEL_NAME || process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
 }
 
 export function getOpenRouterVisionModelName() {
