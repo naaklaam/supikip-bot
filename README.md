@@ -9,8 +9,6 @@ Bot ini dirancang dengan arsitektur terstruktur (`src/`), mendukung **10 Dynamic
 ## Fitur Utama
 
 ### 1. Arsitektur LLM & Dynamic Prompting
-* **Provider Agnostik**: Mendukung berbagai model LLM (Gemini, Claude, Llama, DeepSeek) melalui OpenRouter.
-* **Dynamic System Prompt**: Instruksi dan kepribadian bot digabungkan secara dinamis dari berkas Markdown:
   * [`CORE_IDENTITY.md`](file:///c:/Users/naakl/supikip-bot/CORE_IDENTITY.md): Identitas utama, gaya bahasa, dan aturan operasional.
   * [`AGENTS.md`](file:///c:/Users/naakl/supikip-bot/AGENTS.md): Ringkasan panduan operasional agen.
   * [`MEMORY.md`](file:///c:/Users/naakl/supikip-bot/MEMORY.md): Memori kerja persisten bot.

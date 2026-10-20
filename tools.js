@@ -7,6 +7,7 @@ import { createRequire } from 'module';
 import { atomicWriteJsonSync, atomicWriteFileSync } from './src/utils/atomic_file.js';
 import { reloadCronSchedules } from './src/services/cron_scheduler.js';
 import { getOpenRouterModelName, getOpenRouterParams } from './src/services/model_params.js';
+import { checkIsOwner } from './src/utils/owner_helper.js';
 
 const require = createRequire(import.meta.url);
 const pdf = require('pdf-parse');
@@ -61,7 +62,7 @@ function getSenderJidFromMessage(msg) {
  * Mengambil nomor normalized dari JID WhatsApp.
  */
 function normalizeJidNumber(jid) {
-  return String(jid || '').split('@')[0].replace(/\D/g, '');
+  return String(jid || '').split('@')[0].split(':')[0].replace(/\D/g, '');
 }
 
 /**
@@ -69,13 +70,7 @@ function normalizeJidNumber(jid) {
  * Owner diakui melalui OWNER_NUMBER di .env.
  */
 function isOwnerContext(extraContext = {}) {
-  const msg = extraContext.msg;
-  const senderJid = getSenderJidFromMessage(msg) || extraContext.jid || '';
-  const senderNumber = normalizeJidNumber(senderJid);
-  const ownerConfig = process.env.OWNER_NUMBER || '';
-  const ownerNumbers = ownerConfig.split(',').map(n => n.trim().replace(/\D/g, '')).filter(Boolean);
-
-  return ownerNumbers.includes(senderNumber);
+  return checkIsOwner(extraContext.msg, extraContext.jid);
 }
 
 /**

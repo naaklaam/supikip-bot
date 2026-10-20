@@ -10,6 +10,7 @@ import { saveChatMessage } from '../db/index.js';
 import { getDownloadMediaMessage, getJidNormalizedUser } from '../utils/baileys_loader.js';
 import { getSessionJid } from '../utils/session_helper.js';
 import { getCachedGroupNames } from '../utils/group_resolver.js';
+import { checkIsOwner } from '../utils/owner_helper.js';
 
 // Map untuk melacak status aktifasi Auto-OCR di setiap chat room (JID)
 export const ocrActiveRooms = new Map();
@@ -52,7 +53,7 @@ export async function handleIncomingMessage(sock, msg) {
     let replyLogPart = '';
     if (contextInfo && contextInfo.quotedMessage) {
       const quotedSenderJid = contextInfo.participant;
-      const quotedSenderNumber = quotedSenderJid ? quotedSenderJid.split('@')[0] : '';
+      const quotedSenderNumber = quotedSenderJid ? String(quotedSenderJid).split('@')[0].split(':')[0].replace(/\D/g, '') : '';
       
       let quotedText = contextInfo.quotedMessage.conversation ||
         contextInfo.quotedMessage.extendedTextMessage?.text ||
@@ -80,11 +81,9 @@ export async function handleIncomingMessage(sock, msg) {
     const groupNames = getCachedGroupNames();
     const groupName = isGroup ? (groupNames[jid] || 'Grup') : '';
     const senderJid = msg.key.participant || msg.key.remoteJid;
-    const senderNumber = senderJid.split('@')[0];
+    const senderNumber = String(senderJid || '').split('@')[0].split(':')[0].replace(/\D/g, '');
     const senderName = msg.pushName || senderNumber;
-    const ownerConfig = process.env.OWNER_NUMBER || '';
-    const ownerNumbers = ownerConfig.split(',').map(n => n.trim().replace(/\D/g, '')).filter(Boolean);
-    const isOwner = ownerNumbers.includes(senderNumber);
+    const isOwner = checkIsOwner(msg, jid);
 
     /*
     // Deteksi jika Owner mengirim stiker untuk dijadikan bahan database (DINONAKTIFKAN SEMENTARA)
@@ -111,7 +110,7 @@ export async function handleIncomingMessage(sock, msg) {
 
     // Cari tahu JID bot sendiri dan nomornya (dideklarasikan di level teratas handler pesan masuk)
     const botJid = jidNormalizedUser(sock.user.id);
-    const botNumber = botJid.split('@')[0];
+    const botNumber = String(botJid || '').split('@')[0].split(':')[0].replace(/\D/g, '');
     const lowercaseText = text ? text.toLowerCase() : '';
 
     if (text) {

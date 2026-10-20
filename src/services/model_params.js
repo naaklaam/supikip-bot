@@ -12,7 +12,7 @@ const NUMBER_ALIASES = {
 
 const DEFAULTS = {
   temperature: 0.5,
-  top_p: 1,
+  top_p: 0.8,
   max_tokens: undefined,
   presence_penalty: undefined,
   frequency_penalty: undefined

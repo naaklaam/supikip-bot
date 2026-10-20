@@ -1,3 +1,4 @@
+
 import fs from 'fs';
 import path from 'path';
 import { toolsSchema, executeTool } from '../../tools.js';
@@ -52,7 +53,7 @@ export function getSystemInstruction() {
 
   let finalInstruction = '';
   if (promptParts.length === 0) {
-    finalInstruction = 'Kamu adalah Speaki, asisten AI yang profesional, efisien, dan ketus. Jawab langsung pada inti masalah tanpa basa-basi.' + shinigamiStatus;
+    finalInstruction = 'Kamu adalah Speaki, asisten AI yang, singkat, padat dan jelas. Seperti Prompt ini.' + shinigamiStatus;
   } else {
     finalInstruction = `Kamu adalah asisten AI dengan instruksi terstruktur berikut yang menentukan perilaku, gaya bicara, identitas, dan batasanmu:\n\n` +
       promptParts.join('\n') + shinigamiStatus;
@@ -238,7 +239,7 @@ export async function getOpenRouterResponse(jid, sock, msg) {
       }
     }
 
-    return 'Maaf, saya tidak dapat menyelesaikan pencarian seluruhnya, namun data di atas adalah hasil terbaik yang bisa saya peroleh.';
+    return 'Sorry ga bisa, cari yang laen aja.';
   } catch (error) {
     console.error('Error saat menghubungi OpenRouter:', error);
     return 'Aduh! Gagal konek ke OpenRouter. Coba cek internet atau kuota API-nya!';
