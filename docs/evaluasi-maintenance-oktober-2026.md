@@ -11,12 +11,12 @@
 
 | Komponen | Status | Catatan Temuan |
 |---|---|---|
-| **WhatsApp WebSocket & Auth** | 🔴 **CRITICAL** | Terjebak reconnect loop (`Connection Failure 405 Method Not Allowed`). Sesi login `sesi_speaki/creds.json` kedaluwarsa/dicabut (`registered: false`). |
-| **OpenRouter API Key** | 🟢 **ACTIVE** | Kunci API valid (`HTTP 200`), namun kuota credit menipis (< $1). |
-| **Database SQLite (`speaki.db`)** | 🟢 **HEALTHY** | WAL mode aktif, `PRAGMA integrity_check` = OK, 19.670 pesan terekam aman tanpa korupsi data. |
-| **Manhwa Cover Sticker Generator** | 🟡 **DEGRADED** | Log error `/bin/sh: cwebp: command not found`. ImageMagick & library `sharp` sudah terpasang, namun script scraper masih hardcode ke binary `cwebp`. |
-| **Auth Session Directory** | 🟡 **BLOATED** | Folder `sesi_speaki` menampung 1.468 file session cache usang. |
-| **Dependencies Security** | 🟡 **WARNING** | Terdapat 8 temuan vulnerability di npm packages (`@xmldom`, `sharp`, `undici`, dll). |
+| **WhatsApp WebSocket & Auth** | **CRITICAL** | Terjebak reconnect loop (`Connection Failure 405 Method Not Allowed`). Sesi login `sesi_speaki/creds.json` kedaluwarsa/dicabut (`registered: false`). |
+| **OpenRouter API Key** | **ACTIVE** | Kunci API valid (`HTTP 200`), namun kuota credit menipis (< $1). |
+| **Database SQLite (`speaki.db`)** | **HEALTHY** | WAL mode aktif, `PRAGMA integrity_check` = OK, 19.670 pesan terekam aman tanpa korupsi data. |
+| **Manhwa Cover Sticker Generator** | **DEGRADED** | Log error `/bin/sh: cwebp: command not found`. ImageMagick & library `sharp` sudah terpasang, namun script scraper masih hardcode ke binary `cwebp`. |
+| **Auth Session Directory** | **BLOATED** | Folder `sesi_speaki` menampung 1.468 file session cache usang. |
+| **Dependencies Security** | **WARNING** | Terdapat 8 temuan vulnerability di npm packages (`@xmldom`, `sharp`, `undici`, dll). |
 
 ---
 
@@ -70,7 +70,7 @@ Ketika sudah siap mengaktifkan kembali bot setelah top-up saldo OpenRouter, ikut
    ```bash
    node bot-speaki.js
    ```
-4. Setelah muncul log `Speaki Bot telah sukses terhubung ke WhatsApp! 🎉`, matikan process interaktif (`Ctrl + C`) dan nyalakan kembali systemd service:
+4. Setelah muncul log `Speaki Bot telah sukses terhubung ke WhatsApp!`, matikan process interaktif (`Ctrl + C`) dan nyalakan kembali systemd service:
    ```bash
    sudo systemctl start supikip.service
    sudo systemctl status supikip.service
